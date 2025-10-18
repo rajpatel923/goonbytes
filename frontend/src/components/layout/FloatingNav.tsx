@@ -108,7 +108,7 @@ export function FloatingNav() {
                 className={cn(
                   "flex flex-col items-center justify-center px-3 py-2 rounded-full transition-colors relative flex-1",
                   isActive 
-                    ? "text-primary" 
+                    ? "black" 
                     : "text-muted-foreground text-foreground"
                 )}
               >
@@ -116,7 +116,7 @@ export function FloatingNav() {
                 <span className="text-xs font-medium mt-1">{item.name}</span>
                 {isActive && (
                   <motion.div 
-                    className="absolute inset-0 bg-primary/10 rounded-full -z-10"
+                    className="absolute inset-0 bg-blue-500/10 rounded-full -z-10"
                     layoutId="activeNavBackground"
                     transition={{ type: "spring", duration: 0.6 }}
                   />
