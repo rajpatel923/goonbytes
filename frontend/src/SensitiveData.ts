@@ -1,0 +1,1 @@
+export const MapLibreApiKey: string = "9whJnEiegefRuWcEWJgD";
