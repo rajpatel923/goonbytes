@@ -62,6 +62,11 @@ export default function AccountPage() {
   const [highSeverityEvent, setHighSeverityEvent] = useState<SecurityEvent | null>(null);
   const [showHighSeverityPopup, setShowHighSeverityPopup] = useState(false);
   const [expandedCamera, setExpandedCamera] = useState<number | null>(null);
+  
+  // Video loading states
+  const [videoLoading, setVideoLoading] = useState<boolean[]>([true, true, true, true]);
+  const [videoReady, setVideoReady] = useState<boolean[]>([false, false, false, false]);
+  const videoRefs = useRef<(HTMLVideoElement | null)[]>([null, null, null, null]);
 
   // Add ref to track if subscription is already set up
   const subscriptionSetupRef = useRef(false);
@@ -104,6 +109,51 @@ export default function AccountPage() {
       transition: { duration: 0.5 }
     }
   };
+
+  // Camera video sources - 3 available videos
+  const cameraVideos = [
+    "/videos/Camera 1.mp4",
+    "/videos/Camera 2.mp4",
+    "/videos/Camera 3.mp4",
+    "/videos/Camera 3.mp4",
+  ];
+
+  // Show animation for at least 1.2s, then allow video to appear only after loaded
+  // Different loading times for each video
+  useEffect(() => {
+    setVideoLoading([true, true, true, true]);
+    setVideoReady([false, false, false, false]);
+    // No need to set loading false for missing videos now
+  }, []);
+
+  // When video loaded, set videoReady
+  const handleVideoLoaded = (index: number) => {
+    setVideoReady(prev => {
+      const newState = [...prev];
+      newState[index] = true;
+      return newState;
+    });
+  };
+
+  // When both minimum delay and video loaded, hide animation and show video
+  useEffect(() => {
+    // Set different loading times for each video
+    const delays = [1200, 1800, 2500, 3500]; // ms for each camera
+    cameraVideos.forEach((video, index) => {
+      if (video) {
+        setTimeout(() => {
+          setVideoLoading(prev => {
+            if (videoReady[index]) {
+              const newState = [...prev];
+              newState[index] = false;
+              return newState;
+            }
+            return prev;
+          });
+        }, delays[index]);
+      }
+    });
+  }, [videoReady]);
 
 
   const startCamera = async () => {
@@ -782,16 +832,137 @@ export default function AccountPage() {
                       <motion.div
                         key={i}
                         variants={cardVariants}
-                        className="group relative rounded-2xl border border-white/10 bg-zinc-900/40 p-8 backdrop-blur hover:border-blue-500/30 transition-all duration-300 h-80 cursor-pointer hover:scale-105"
+                        className="group relative rounded-2xl border border-white/10 bg-zinc-900/40 backdrop-blur hover:border-blue-500/30 transition-all duration-300 h-80 cursor-pointer hover:scale-105 overflow-hidden"
                         onClick={() => setExpandedCamera(i)}
                       >
                         <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl" />
-                        <div className="absolute inset-0 flex items-center justify-center text-zinc-400 group-hover:text-zinc-300 transition-colors">
-                          <div className="text-center">
-                            <Eye className="w-12 h-12 mx-auto mb-3" />
-                            <span className="text-lg font-medium">Camera {i + 1} feed</span>
-                            <p className="text-sm text-zinc-500 mt-2">Click to expand</p>
+                        
+                        {/* Loading State */}
+                        {videoLoading[i] && (
+                          <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-900 z-10"
+                          >
+                            <div className="text-center">
+                              <motion.div
+                                animate={{
+                                  scale: [1, 1.2, 1],
+                                  rotate: [0, 360],
+                                }}
+                                transition={{
+                                  duration: 2,
+                                  repeat: Infinity,
+                                  ease: "easeInOut"
+                                }}
+                              >
+                                <Loader2 className="w-16 h-16 mx-auto mb-4 text-blue-400" />
+                              </motion.div>
+                              <motion.div
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.2 }}
+                              >
+                                <span className="text-xl font-semibold text-white">Loading Camera {i + 1}</span>
+                                
+                                {/* Animated Progress Bar */}
+                                <div className="w-48 h-1 bg-zinc-700 rounded-full mx-auto mt-4 overflow-hidden">
+                                  <motion.div
+                                    className="h-full bg-gradient-to-r from-blue-400 via-blue-500 to-blue-600"
+                                    initial={{ x: "-100%" }}
+                                    animate={{ x: "100%" }}
+                                    transition={{
+                                      duration: 1.5,
+                                      repeat: Infinity,
+                                      ease: "easeInOut"
+                                    }}
+                                  />
+                                </div>
+                                
+                                <div className="flex items-center justify-center gap-1 mt-3">
+                                  <motion.div
+                                    className="w-2 h-2 bg-blue-400 rounded-full"
+                                    animate={{ opacity: [1, 0.3, 1] }}
+                                    transition={{ duration: 1, repeat: Infinity, delay: 0 }}
+                                  />
+                                  <motion.div
+                                    className="w-2 h-2 bg-blue-400 rounded-full"
+                                    animate={{ opacity: [1, 0.3, 1] }}
+                                    transition={{ duration: 1, repeat: Infinity, delay: 0.2 }}
+                                  />
+                                  <motion.div
+                                    className="w-2 h-2 bg-blue-400 rounded-full"
+                                    animate={{ opacity: [1, 0.3, 1] }}
+                                    transition={{ duration: 1, repeat: Infinity, delay: 0.4 }}
+                                  />
+                                </div>
+                              </motion.div>
+                            </div>
+                          </motion.div>
+                        )}
+                        
+                        {/* Video Feed or Placeholder */}
+                        {cameraVideos[i] ? (
+                          <motion.video
+                            ref={el => videoRefs.current[i] = el}
+                            className="w-full h-full object-cover rounded-2xl"
+                            loop
+                            muted
+                            playsInline
+                            autoPlay
+                            onLoadedData={() => handleVideoLoaded(i)}
+                            onError={() => handleVideoLoaded(i)}
+                            initial={false}
+                            animate={{
+                              opacity: videoLoading[i] ? 0 : 1,
+                              scale: videoLoading[i] ? 1.1 : 1,
+                              pointerEvents: videoLoading[i] ? "none" : "auto"
+                            }}
+                            transition={{ duration: 0.8, ease: "easeOut" }}
+                            style={{ position: "absolute", inset: 0 }}
+                          >
+                            <source src={cameraVideos[i]!} type="video/mp4" />
+                          </motion.video>
+                        ) : (
+                          <div className="absolute inset-0 flex items-center justify-center text-zinc-400 group-hover:text-zinc-300 transition-colors">
+                            <div className="text-center">
+                              <Eye className="w-12 h-12 mx-auto mb-3" />
+                              <span className="text-lg font-medium">Camera {i + 1} feed</span>
+                              <p className="text-sm text-zinc-500 mt-2">No video available</p>
+                            </div>
                           </div>
+                        )}
+                        
+                        {/* Camera Label Overlay */}
+                        <motion.div 
+                          className="absolute top-4 left-4 bg-black/70 text-white px-3 py-1.5 rounded-lg text-sm font-medium backdrop-blur-sm"
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ 
+                            opacity: videoLoading[i] ? 0 : 1,
+                            x: videoLoading[i] ? -20 : 0
+                          }}
+                          transition={{ duration: 0.5, delay: 0.3 }}
+                        >
+                          Camera {i + 1}
+                        </motion.div>
+                        
+                        {/* Live Indicator */}
+                        {cameraVideos[i] && !videoLoading[i] && (
+                          <motion.div 
+                            className="absolute top-4 right-4 flex items-center gap-2 bg-red-600/90 text-white px-3 py-1.5 rounded-lg text-sm font-medium backdrop-blur-sm"
+                            initial={{ opacity: 0, x: 20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ duration: 0.5, delay: 0.4 }}
+                          >
+                            <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
+                            LIVE
+                          </motion.div>
+                        )}
+                        
+                        {/* Click to expand hint */}
+                        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/70 text-white px-4 py-2 rounded-full text-sm backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                          Click to expand
                         </div>
                       </motion.div>
                     ))}
@@ -1226,21 +1397,33 @@ export default function AccountPage() {
 
             {/* Camera Feed Content */}
             <div className="pt-16 h-full flex items-center justify-center bg-black">
-              <div className="relative w-full h-full max-w-5xl max-h-[70vh] bg-zinc-800 rounded-2xl border border-white/10 flex items-center justify-center">
-                <div className="text-center">
-                  <Eye className="w-24 h-24 mx-auto mb-6 text-blue-400 animate-pulse" />
-                  <h3 className="text-3xl font-bold text-white mb-2">Camera {expandedCamera + 1} Feed</h3>
-                  <p className="text-xl text-zinc-400 mb-4">Live Security Feed</p>
-                  <div className="flex items-center justify-center gap-2 mb-6">
-                    <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
-                    <span className="text-sm text-red-400 font-medium">LIVE</span>
+              <div className="relative w-full h-full max-w-5xl max-h-[70vh] bg-zinc-800 rounded-2xl border border-white/10 flex items-center justify-center overflow-hidden">
+                {cameraVideos[expandedCamera] ? (
+                  <video
+                    className="w-full h-full object-contain"
+                    loop
+                    muted
+                    autoPlay
+                    playsInline
+                  >
+                    <source src={cameraVideos[expandedCamera]!} type="video/mp4" />
+                  </video>
+                ) : (
+                  <div className="text-center">
+                    <Eye className="w-24 h-24 mx-auto mb-6 text-blue-400 animate-pulse" />
+                    <h3 className="text-3xl font-bold text-white mb-2">Camera {expandedCamera + 1} Feed</h3>
+                    <p className="text-xl text-zinc-400 mb-4">Live Security Feed</p>
+                    <div className="flex items-center justify-center gap-2 mb-6">
+                      <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+                      <span className="text-sm text-red-400 font-medium">LIVE</span>
+                    </div>
+                    <div className="text-sm text-zinc-500">
+                      <p>Resolution: 1920x1080</p>
+                      <p>FPS: 30</p>
+                      <p>Status: Active</p>
+                    </div>
                   </div>
-                  <div className="text-sm text-zinc-500">
-                    <p>Resolution: 1920x1080</p>
-                    <p>FPS: 30</p>
-                    <p>Status: Active</p>
-                  </div>
-                </div>
+                )}
                 {/* Simulated camera overlay elements */}
                 <div className="absolute top-4 left-4 bg-red-600/90 text-white px-3 py-1 rounded-full text-sm font-medium animate-pulse">
                   LIVE FEED
