@@ -35,6 +35,9 @@ Thumbs.db
 *.flv
 *.webm
 
+# Video directories
+backend/roboflow-image/videos/
+
 # Large data files
 *.zip
 *.tar.gz
