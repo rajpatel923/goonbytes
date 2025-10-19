@@ -101,17 +101,31 @@ def extract_frame_summary(result: Dict[str, Any]) -> Dict[str, Any]:
     video_score = None
     detections = []
 
-    preds = result.get("predictions") or result.get("prediction")
+    # Handle new input format: object.predictions[0] (ObjectDetectionPrediction objects)
+    if hasattr(result, 'predictions') and result.predictions:
+        # New format: result is an object with predictions attribute
+        preds = result.predictions
+    else:
+        # Legacy format: result is a dict
+        preds = result.get("predictions") or result.get("prediction")
 
     if preds and isinstance(preds, (list, tuple)):
         for p in preds:
             conf = None
             label = None
-            if isinstance(p, dict):
+            
+            # Handle ObjectDetectionPrediction objects (new format)
+            if hasattr(p, 'confidence') and hasattr(p, 'class_name'):
+                conf = getattr(p, 'confidence', None)
+                label = getattr(p, 'class_name', None)
+            # Handle dict format (legacy)
+            elif isinstance(p, dict):
                 conf = p.get("confidence") or p.get("score") or p.get("probability")
                 label = p.get("class") or p.get("label") or p.get("class_name")
-            if conf is None and isinstance(p, (int, float)):
+            # Handle simple numeric format
+            elif isinstance(p, (int, float)):
                 conf = float(p)
+            
             try:
                 conf = float(conf) if conf is not None else None
             except Exception:
