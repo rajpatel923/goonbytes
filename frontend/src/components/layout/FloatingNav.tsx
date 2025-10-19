@@ -108,8 +108,8 @@ export function FloatingNav() {
                 className={cn(
                   "flex flex-col items-center justify-center px-3 py-2 rounded-full transition-colors relative flex-1",
                   isActive 
-                    ? "black" 
-                    : "text-muted-foreground text-foreground"
+                    ? "text-white" 
+                    : "text-muted-foreground text-foreground text-white"
                 )}
               >
                 <item.icon className="w-5 h-5" />
