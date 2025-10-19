@@ -526,8 +526,6 @@ export default function AccountPage() {
       "Camera 2",
       "Camera 3",
       "Camera 4",
-      "Camera 5",
-      "Camera 6",
     ];
     const types = ["Weapon detected", "Gunshot heard"];
     const ev: SecurityEvent = {
@@ -674,7 +672,7 @@ export default function AccountPage() {
               <Button 
                 onClick={signOut} 
                 variant="outline" 
-                className="rounded-full border border-white/20 px-6 py-2 text-base font-medium hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/40 transition-all"
+                className="rounded-full border border-white/20 px-6 py-2 text-base font-medium hover:bg-black/10 bg-black focus:outline-none focus:ring-2 focus:ring-black/40 transition-all"
               >
                 Sign Out
               </Button>
@@ -780,7 +778,7 @@ export default function AccountPage() {
                 <div>
                   <h2 className="text-2xl font-semibold mb-2 text-white">Security Feeds</h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    {Array.from({ length: 6 }).map((_, i) => (
+                    {Array.from({ length: 4 }).map((_, i) => (
                       <motion.div
                         key={i}
                         variants={cardVariants}
@@ -1264,4 +1262,3 @@ export default function AccountPage() {
     </main>
   );
 }
- 
