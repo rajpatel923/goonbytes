@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Setup script for Roboflow Inference Pipeline
-echo "Setting up Roboflow Inference Pipeline..."
+# Setup script for Gun Detection System
+echo "Setting up Gun Detection System..."
 
 # Check if virtual environment exists
 if [ ! -d "venv" ]; then
@@ -17,9 +17,8 @@ source venv/bin/activate
 echo "Installing requirements..."
 pip install -r requirements.txt
 
-echo "Setup complete!"
+echo "✅ Setup complete!"
 echo ""
-echo "To run the inference pipeline:"
-echo "1. Activate the virtual environment: source venv/bin/activate"
-echo "2. Update the API key in inference_pipeline.py"
-echo "3. Run: python inference_pipeline.py"
+echo "Next steps:"
+echo "1. Create .env file: echo 'ROBOFLOW_API_KEY=your_key' > .env"
+echo "2. Run: ./run_live_detection.sh"

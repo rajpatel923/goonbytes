@@ -1,66 +1,66 @@
-# General
-.DS_Store
-Thumbs.db
-*.log
-
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-.Python
+# Virtual environments
+venv/
 env/
-ENV/
-venv/
-.venv
 .venv/
-pip-wheel-metadata/
-*.egg-info/
-*.egg
-build/
-dist/
-eggs/
-.eggs/
-.python-version
-.pytest_cache/
-.mypy_cache/
-.coverage
-coverage.xml
-htmlcov/
-.tox/
+.env/
 
-# Virtual environments in any subdirectory
-venv/
-.venv
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
 
-# Node
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-.pnp.*
-.cache/
-dist/
-build/
-.parcel-cache/
-.turbo/
-.vite/
-
-# Bun (lockfile is usually committed; do not ignore by default)
-# bun.lockb
-
-# IDEs and editors
+# IDE files
 .vscode/
 .idea/
-*.sublime-workspace
-*.sublime-project
+*.swp
+*.swo
 
-# Jupyter
-.ipynb_checkpoints/
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 
-# OS generated
-Icon?
-Desktop.ini
+# Media files
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.wmv
+*.flv
+*.webm
+
+# Video directories
+backend/roboflow-image/videos/
+
+# Large data files
+*.zip
+*.tar.gz
+*.rar
+
+# Logs
+*.log
+logs/
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Node modules (if any)
+node_modules/
+
+# Build outputs
+dist/
+build/
+*.egg-info/
 
 # Python ML model and checkpoint files (often large)
 *.pt
@@ -71,14 +71,17 @@ Desktop.ini
 weights/
 models/
 
+# Jupyter
+.ipynb_checkpoints/
+
+# OS generated
+Icon?
+Desktop.ini
+
 # Misc
-*.pyc
-*.pyo
-*.pyd
 *.so
 *.o
 *.sqlite3
 local_settings.py
-.env
 .env.*
 .secret
