@@ -1,21 +1,39 @@
 #!/bin/bash
 
-echo "🔫 Gun Detection System"
-echo "======================="
+# Live Gun Detection Startup Script
+echo "🔫 Live Gun Detection System"
+echo "=========================="
 
-# Check virtual environment
+# Check if virtual environment exists
 if [ ! -d "venv" ]; then
-    echo "❌ Run ./setup.sh first!"
+    echo "❌ Virtual environment not found!"
+    echo "Run ./setup.sh first to set up the environment"
     exit 1
 fi
 
-# Check .env file
+# Check if .env file exists
 if [ ! -f ".env" ]; then
-    echo "❌ Create .env file with your ROBOFLOW_API_KEY"
+    echo "❌ .env file not found!"
+    echo "Please create a .env file with your Roboflow API key"
     exit 1
 fi
 
-# Activate and run
+# Activate virtual environment
+echo "🔧 Activating virtual environment..."
 source venv/bin/activate
-echo "🎥 Starting detection... (Press 'q' to quit)"
+
+# Install/update dependencies
+echo "📦 Installing dependencies..."
+pip install -r requirements.txt
+
+echo ""
+echo "🎥 Starting Live Gun Detection..."
+echo "================================="
+echo ""
+echo "📹 Using your FaceTime camera for real-time detection"
+echo "🔫 Will show red boxes around detected guns"
+echo "⌨️  Press 'q' to quit"
+echo ""
+
+# Start the live detection
 python live_gun_detection.py

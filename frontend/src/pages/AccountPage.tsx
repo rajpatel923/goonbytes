@@ -1,767 +1,328 @@
+import { useEffect, useRef, useState } from "react";
+import { motion, useInView } from "framer-motion";
+import { AlertTriangle, Camera, Check, Loader2, Video, X, Shield, Zap, Eye, Bell, Clock } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/lib/supabase";
-import imageCompression from "browser-image-compression";
-import { motion } from "framer-motion";
-import { Loader2, Plus, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { cn } from "@/lib/utils";
 
-import { useLocation } from "react-router-dom";
-
-// Mapping of disease names to their info URLs
-
-const diseaseWebsites = {
-  "Apple Healthy": "https://www.almanac.com/plant/apples",
-  "Apple Apple Scab":
-    "https://extension.umn.edu/plant-diseases/apple-scab#:~:text=Quick%20facts&text=Scab%20is%20caused%20by%20a,many%20years%20in%20a%20row.",
-  "Apple Black Rot":
-    "https://extension.wvu.edu/lawn-gardening-pests/plant-disease/tree-fruit-disease/black-rot-disease-in-apples#:~:text=Black%20rot%20disease%2C%20caused%20by,varieties%20are%20the%20preferred%20hosts.",
-  "Apple Cedar Apple Rust":
-    "https://mortonarb.org/plant-and-protect/tree-plant-care/plant-care-resources/cedar-apple-rust/#:~:text=Cedar-apple%20rust%20is%20the,the%20survival%20of%20the%20fungus.",
-  "Bell Pepper Healthy":
-    "https://www.gardentech.com/blog/garden-and-lawn-protection/growing-your-own-bell-peppers#:~:text=Depending%20on%20your%20chosen%20varieties,on%20the%20vine%20whenever%20possible.",
-  "Bell Pepper Bacterial Spot":
-    "https://extension.wvu.edu/lawn-gardening-pests/plant-disease/fruit-vegetable-diseases/bacterial-leaf-spot-of-pepper#:~:text=Bacterial%20leaf%20spot%2C%20caused%20by,2005).",
-  "Cherry Healthy": "https://www.almanac.com/plant/cherries",
-  "Cherry Powdery Mildew":
-    "https://treefruit.wsu.edu/crop-protection/disease-management/cherry-powdery-mildew/#:~:text=Powdery%20mildew%20of%20sweet%20and,1).",
-  "Corn (Maize) Healthy": "https://ohioline.osu.edu/factsheet/anr-0148",
-  "Corn (Maize) Cercospora Leaf Spot":
-    "https://cropprotectionnetwork.org/encyclopedia/gray-leaf-spot-of-corn#:~:text=Gray%20leaf%20spot%2C%20caused%20by,to%20three%20weeks%20before%20tasseling.",
-  "Corn (Maize) Common Rust":
-    "https://extension.umn.edu/corn-pest-management/common-rust-corn#:~:text=Common%20rust%20frequently%20occurs%20in,the%20appearance%20of%20brown%20pustules.",
-  "Corn (Maize) Northern Leaf Blight":
-    "https://extension.umn.edu/corn-pest-management/northern-corn-leaf-blight#:~:text=Northern%20corn%20leaf%20blight%20occurs,hybrids%20are%20infected%20before%20silking.",
-  "Grape Healthy":
-    "https://wineserver.ucdavis.edu/viticulture-grape-growing-information",
-  "Grape Black Rot":
-    "https://extension.psu.edu/black-rot-on-grapes-in-home-gardens",
-  "Grape Esca (Black Measles)":
-    "https://ipm.ucanr.edu/agriculture/grape/esca-black-measles/#gsc.tab=0",
-  "Grape Leaf Blight":
-    "https://apps.extension.umn.edu/garden/diagnose/plant/fruit/grape/leavesspots.html",
-  "Peach Healthy": "https://www.britannica.com/plant/peach",
-  "Peach Bacterial Spot":
-    "https://www.aces.edu/blog/topics/crop-production/bacterial-spot-treatment-in-peaches/#:~:text=Symptoms%20of%20bacterial%20spot%20are,angular%20appearance%20(figure%201).",
-  "Potato Healthy": "https://www.almanac.com/plant/potatoes",
-  "Potato Early Blight":
-    "https://ipm.cahnr.uconn.edu/early-blight-and-late-blight-of-potato/#:~:text=Early%20blight%20of%20potato%20is,affects%20young%2C%20vigorously%20growing%20plants.",
-  "Potato Late Blight":
-    "https://ipm.cahnr.uconn.edu/early-blight-and-late-blight-of-potato/#:~:text=Early%20blight%20of%20potato%20is,affects%20young%2C%20vigorously%20growing%20plants.",
-  "Strawberry Healthy":
-    "https://bonnieplants.com/blogs/how-to-grow/growing-strawberries",
-  "Strawberry Leaf Scorch":
-    "https://ipm.ucanr.edu/PMG/GARDEN/FRUIT/DISEASE/leafscorch.html#:~:text=Leaf%20scorch%20causes%20brown%20to,%2C%20temperature%2C%20and%20other%20factors.",
-  "Tomato Healthy":
-    "https://extension.unh.edu/resource/growing-vegetables-tomatoes-fact-sheet-1",
-  "Tomato Bacterial Spot":
-    "https://hort.extension.wisc.edu/articles/bacterial-spot-of-tomato/#:~:text=Bacterial%20spot%20can%20affect%20all,brownish-red%20as%20they%20age.",
-  "Tomato Early Blight":
-    "https://extension.umd.edu/resource/early-blight-tomatoes/",
-  "Tomato Late Blight": "https://www.rhs.org.uk/disease/tomato-blight",
-  "Tomato Septoria Leaf Spot":
-    "https://portal.ct.gov/caes/fact-sheets/plant-pathology/septoria-leaf-spot-of-tomato#:~:text=Septoria%20leaf%20spot%20is%20caused,%2C%20stems%2C%20and%20the%20calyx.",
-  "Tomato Yellow Leaf Curl Virus":
-    "https://agriculture.vic.gov.au/biosecurity/plant-diseases/vegetable-diseases/tomato-yellow-leaf-curl-virus#:~:text=Tomato%20yellow%20leaf%20curl%20virus%20(TYLCV)%20can%20infect%20over%2030,silverleaf%20whitefly%20(Bemisia%20tabaci).",
-  "Cassava Bacterial Blight (CBB)":
-    "https://pmc.ncbi.nlm.nih.gov/articles/PMC8578842/#:~:text=Cassava%20bacterial%20blight%20(CBB)%20is,and%20the%20crop%20are%20limited.",
-  "Cassava Brown Streak Disease (CBSD)":
-    "https://www.sciencedirect.com/topics/agricultural-and-biological-sciences/cassava-brown-streak-virus",
-  "Cassava Green Mottle (CGM)":
-    "https://plantwiseplusknowledgebank.org/doi/10.1079/pwkb.20227800039",
-  "Cassava Mosaic Disease (CMD)":
-    "https://farmonaut.com/blogs/cassava-mosaic-disease-symptoms-treatment-and-organic-control-methods-for-infected-plants/#:~:text=Cassava%20Mosaic%20Disease%20is%20a,as%20vectors%20for%20the%20virus.",
-  Healthy: "https://plants.usda.gov/DocumentLibrary/plantguide/pdf/pg_maes.pdf",
-};
-
-// Type for a saved location entry
-type SavedLocation = {
-  id: string;
-  location: string;
-  date: string;
-  top_crops: string[];
-  coordinates: { lat: number; lng: number };
-};
-
-// Type for a saved crop entry
-interface SavedCrop {
-  id: string;
-  crop_name: string;
-  image_url: string;
-  date_planted: string;
-  plant_type: string;
-  location: string;
-  growth_season: string;
-  harvest_time: string;
-  notes?: string;
-  disease_status: string | null;
-}
-
-interface SavedFarm {
-  id: string;
-  farm_name: string;
-  image_url: string;
-  date_created: string;
-  farm_type: string;
-  location_id: string;
-  crop_ids: string[];
-  notes?: string;
-  location?: string;
-}
-
+// Security Dashboard page: left sub-nav (Feed, Live Camera, Emergency SOS),
+// center content (6 feed placeholders or live view or SOS), right Events with Live/Past.
 export default function AccountPage() {
   const { user, signOut, loading } = useAuth();
-  const navigate = useNavigate();
   const { toast } = useToast();
-  const [savedLocations, setSavedLocations] = useState<SavedLocation[]>([]);
-  const [loadingData, setLoadingData] = useState(true);
-  const [savedCrops, setSavedCrops] = useState<SavedCrop[]>([]);
-  const [savedFarms, setSavedFarms] = useState<SavedFarm[]>([]);
-  const [loadingCrops, setLoadingCrops] = useState(true);
-  const [loadingFarms, setLoadingFarms] = useState(true);
-  const [showCropModal, setShowCropModal] = useState(false);
-  const [showAddFarmModal, setShowFarmModal] = useState(false);
-  const [expandedFarm, setExpandedFarm] = useState<SavedFarm | null>(null);
-  const [newCrop, setNewCrop] = useState<Partial<SavedCrop>>({});
-  const [newFarm, setNewFarm] = useState<Partial<SavedFarm>>({});
-  const [uploading, setUploading] = useState(false);
-  const [expandedCrop, setExpandedCrop] = useState<SavedCrop | null>(null);
-  const [imageInputMode, setImageInputMode] = useState<"upload" | "link">(
-    "upload"
-  );
-  const [editCropMode, setCropEditMode] = useState(false);
-  const [editFarmMode, setFarmEditMode] = useState(false);
-  const [deletingFarmId, setDeletingFarmId] = useState<string | null>(null);
-  const [deletingCropId, setDeletingCropId] = useState<string | null>(null);
 
-  const [cropAILoading, setCropAILoading] = useState<boolean>(false);
+  type SubTab = "feed" | "live" | "sos";
+  const [subTab, setSubTab] = useState<SubTab>("feed");
 
-  const location = useLocation();
-
-  const getSavedLocationString = (location_id: string): string => {
-    if (savedLocations.length <= 0) {
-      return "";
-    }
-
-    savedLocations.forEach((location) => {
-      if (location.id == location_id) {
-        return location.location;
-      }
-    });
-
-    return "";
+  // AI Model Event Types
+  type AIModelEvent = {
+    event_id: string;
+    camera_id: string;
+    event_start: string;
+    event_end: string;
+    combined_score: number;
+    scores: {
+      video: number;
+      audio: number;
+    };
+    detections: any[]; // Array of detection objects
+    severity: "low" | "medium" | "high";
   };
 
-  const addFarmFromMap = async (selectedLocation: string | null) => {
-    const locationArr: string[] = selectedLocation.split(", ");
+  type SecurityEvent = {
+    id: string;
+    camera: string;
+    detected: string;
+    timestamp: string;
+    status: "live" | "accepted" | "rejected";
+    // AI Model fields
+    event_id?: string;
+    camera_id?: string;
+    event_start?: string;
+    event_end?: string;
+    combined_score?: number;
+    scores?: {
+      video: number;
+      audio: number;
+    };
+    detections?: any[];
+    severity?: "low" | "medium" | "high";
+  };
+  const [liveEvents, setLiveEvents] = useState<SecurityEvent[]>([]);
+  const [pastEvents, setPastEvents] = useState<SecurityEvent[]>([]);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const [camStarting, setCamStarting] = useState(false);
+  const [eventsTab, setEventsTab] = useState<"live" | "past">("live");
+  const [highSeverityEvent, setHighSeverityEvent] = useState<SecurityEvent | null>(null);
+  const [showHighSeverityPopup, setShowHighSeverityPopup] = useState(false);
+  const [expandedCamera, setExpandedCamera] = useState<number | null>(null);
 
-    const today = new Date();
+  // Animation refs and variants
+  const headerRef = useRef(null);
+  const mainContentRef = useRef(null);
+  const eventsRef = useRef(null);
+  
+  const isHeaderInView = useInView(headerRef, { once: true, amount: 0.3 });
+  const isMainContentInView = useInView(mainContentRef, { once: true, amount: 0.2 });
+  const isEventsInView = useInView(eventsRef, { once: true, amount: 0.2 });
 
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, "0"); // Months are zero-based
-    const day = String(today.getDate()).padStart(2, "0");
+  const fadeInUpVariants = {
+    hidden: { opacity: 0, y: 30 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: 0.6 }
+    }
+  };
 
-    const dateString = `${year}-${month}-${day}`;
+  const staggerContainer = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.15,
+        delayChildren: 0.1
+      }
+    }
+  };
 
-    const { data, error } = await supabase
-      .from("saved_locations")
-      .insert([
-        {
-          coordinates: {
-            lng: Number.parseInt(locationArr[0]),
-            lat: Number.parseInt(locationArr[1]),
-          },
-          date: dateString,
-          location: selectedLocation,
-          top_crops: [""],
-          user_id: user.id,
-        },
-      ])
-      .select();
+  const cardVariants = {
+    hidden: { opacity: 0, y: 20, scale: 0.95 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      scale: 1,
+      transition: { duration: 0.5 }
+    }
+  };
 
-    if (error) throw error;
 
-    setNewFarm({
-      ...newFarm,
-      location_id: data[0].id,
-      location: selectedLocation,
-      date_created: dateString,
-    });
-    setShowFarmModal(true);
+  const startCamera = async () => {
+    if (camStarting || streamRef.current) return;
+    setCamStarting(true);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }, 
+        audio: false 
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.onloadedmetadata = () => {
+          videoRef.current?.play().catch(() => {
+            console.log("Autoplay prevented, user interaction required");
+          });
+        };
+      }
+      toast({ title: "Camera started", description: "Live feed is now active" });
+    } catch (err: any) {
+      console.error("Camera error:", err);
+      toast({ 
+        title: "Camera error", 
+        description: err?.message || "Unable to access camera. Please check permissions.",
+        variant: "destructive"
+      });
+    } finally {
+      setCamStarting(false);
+    }
+  };
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => {
+        track.stop();
+        console.log("Stopped track:", track.kind);
+      });
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+      videoRef.current.pause();
+    }
+    toast({ title: "Camera stopped", description: "Live feed has been disabled" });
   };
 
   useEffect(() => {
-    if (location.state?.addingFarmFromMap) {
-      const selectedLocation: string | null = location.state?.selectedLocation;
-      addFarmFromMap(selectedLocation);
+    if (subTab === "live") {
+      startCamera();
+    } else {
+      stopCamera();
     }
-  }, [navigate]);
+    return () => {
+      stopCamera();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subTab]);
 
-  useEffect(() => {
-    // Redirect if not logged in
-    if (!loading && !user) {
-      navigate("/");
-    }
-
-    // Fetch saved locations from Supabase
-    const fetchSavedLocationsAndFarms = async () => {
-      if (!user) return;
-
-      let locationData;
-
-      try {
-        const { data, error } = await supabase
-          .from("saved_locations")
-          .select("*")
-          .order("created_at", { ascending: false });
-
-        if (error) {
-          throw error;
-        }
-
-        // Format data for UI
-        locationData = data.map((location) => ({
-          id: location.id,
-          location: location.location,
-          date: location.date,
-          top_crops: location.top_crops,
-          coordinates:
-            typeof location.coordinates === "object" &&
-            location.coordinates !== null &&
-            "lat" in location.coordinates &&
-            "lng" in location.coordinates
-              ? (location.coordinates as { lat: number; lng: number })
-              : { lat: 0, lng: 0 },
-        }));
-        setSavedLocations(locationData);
-      } catch (error: unknown) {
-        const errorMessage =
-          error instanceof Error ? error.message : "Unknown error occurred";
-        console.error("Error fetching saved locations:", errorMessage);
-        toast({
-          title: "Error fetching locations",
-          description:
-            "We couldn't load your saved locations. Please try again later.",
-          variant: "destructive",
-        });
-      } finally {
-        setLoadingData(false);
-      }
-
-      try {
-        const { data, error } = await supabase
-          .from("saved_farms")
-          .select("*")
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: false });
-        if (error) throw error;
-        // Format data for UI
-        let formattedFarms = (data || []).map((farm: SavedFarm) => ({
-          id: farm.id,
-          farm_name: farm.farm_name,
-          image_url: farm.image_url,
-          date_created: farm.date_created,
-          farm_type: farm.farm_type,
-          location_id: farm.location_id,
-          crop_ids: farm.crop_ids,
-          notes: farm.notes || undefined,
-        }));
-
-        if (formattedFarms.length > 0 && locationData.length > 0) {
-          formattedFarms.forEach((currFarm) => {
-            locationData.forEach((currLocation) => {
-              if (currFarm.location_id == currLocation.id) {
-                formattedFarms = formattedFarms.map((farm) =>
-                  farm.id === currFarm.id
-                    ? { ...farm, location: currLocation.location }
-                    : farm
-                );
-              }
-            });
-          });
-        }
-
-        setSavedFarms(formattedFarms);
-      } catch (error: unknown) {
-        const errorMessage =
-          error instanceof Error ? error.message : "Unknown error occurred";
-        toast({
-          title: "Error fetching farms",
-          description:
-            "We couldn't load your saved farms. Please try again later.",
-          variant: "destructive",
-        });
-      } finally {
-        setLoadingFarms(false);
-      }
+  // Function to handle incoming AI model events
+  const handleAIModelEvent = (aiEvent: AIModelEvent) => {
+    console.log("Received AI model event:", aiEvent);
+    
+    // Convert AI event to SecurityEvent format
+    const getEventDescription = (detections: any[]) => {
+      if (!detections || detections.length === 0) return "Unknown threat detected";
+      const types = [...new Set(detections.map(d => d.type))];
+      if (types.includes("weapon")) return "Weapon detected";
+      if (types.includes("gunshot")) return "Gunshot detected";
+      if (types.includes("violence")) return "Violence detected";
+      if (types.includes("suspicious_behavior")) return "Suspicious behavior detected";
+      if (types.includes("unauthorized_access")) return "Unauthorized access detected";
+      if (types.includes("threat")) return "Threat detected";
+      return "Security threat detected";
     };
 
-    // Fetch saved crops from Supabase
-    const fetchSavedCrops = async () => {
-      if (!user) return;
-      try {
-        const { data, error } = await supabase
-          .from("saved_crops")
-          .select("*")
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: false });
-        if (error) throw error;
-        // Format data for UI
-        const formattedCrops = (data || []).map((crop: SavedCrop) => ({
-          id: crop.id,
-          crop_name: crop.crop_name,
-          image_url: crop.image_url,
-          date_planted: crop.date_planted,
-          plant_type: crop.plant_type,
-          location: crop.location,
-          growth_season: crop.growth_season,
-          harvest_time: crop.harvest_time,
-          disease_status: crop.disease_status,
-          notes: crop.notes || undefined,
-        }));
-        setSavedCrops(formattedCrops);
-      } catch (error: unknown) {
-        const errorMessage =
-          error instanceof Error ? error.message : "Unknown error occurred";
-        toast({
-          title: "Error fetching crops",
-          description:
-            "We couldn't load your saved crops. Please try again later.",
-          variant: "destructive",
-        });
-      } finally {
-        setLoadingCrops(false);
-      }
+    const securityEvent: SecurityEvent = {
+      id: aiEvent.event_id,
+      camera: `Camera ${aiEvent.camera_id}`,
+      detected: getEventDescription(aiEvent.detections),
+      timestamp: new Date(aiEvent.event_start).toLocaleString(),
+      status: "live",
+      event_id: aiEvent.event_id,
+      camera_id: aiEvent.camera_id,
+      event_start: aiEvent.event_start,
+      event_end: aiEvent.event_end,
+      combined_score: aiEvent.combined_score,
+      scores: aiEvent.scores,
+      detections: aiEvent.detections,
+      severity: aiEvent.severity,
     };
 
-    if (user) {
-      fetchSavedLocationsAndFarms();
-      fetchSavedCrops();
-    }
-  }, [user, loading, navigate, toast]);
+    // Add to live events
+    setLiveEvents((prev) => [securityEvent, ...prev]);
 
-  // Handler for deleting a farm
-  const handleDeleteFarm = async (farmId: string) => {
-    if (
-      !confirm(
-        "Are you sure you want to delete this farm? This action cannot be undone."
-      )
-    ) {
-      return;
-    }
-
-    setDeletingFarmId(farmId);
-    try {
-      const { error } = await supabase
-        .from("saved_farms")
-        .delete()
-        .eq("id", farmId);
-
-      if (error) throw error;
-
-      // Remove the farm from local state
-      setSavedFarms((prevFarms) =>
-        prevFarms.filter((farm) => farm.id !== farmId)
-      );
-
-      // Close expanded farm modal if it's the one being deleted
-      if (expandedFarm?.id === farmId) {
-        setExpandedFarm(null);
-      }
-
-      toast({ title: "Farm deleted successfully!" });
-    } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error occurred";
+    // Show appropriate UI based on severity
+    if (aiEvent.severity === "high") {
+      setHighSeverityEvent(securityEvent);
+      setShowHighSeverityPopup(true);
       toast({
-        title: "Error deleting farm",
-        description: errorMessage,
+        title: "🚨 HIGH SEVERITY ALERT",
+        description: `Weapon detected on ${securityEvent.camera} - Immediate action required!`,
         variant: "destructive",
       });
-    } finally {
-      setDeletingFarmId(null);
+    } else {
+      const severityColor = aiEvent.severity === "medium" ? "orange" : "blue";
+      toast({
+        title: `Security Alert (${aiEvent.severity.toUpperCase()})`,
+        description: `${securityEvent.detected} • ${securityEvent.camera}`,
+        variant: "default",
+      });
     }
   };
 
-  const detectDiseaseDuringEdit = async (publicUrlData: {
-    publicUrl: string;
-  }) => {
-    setCropAILoading(true);
+  // Simulate AI model event for testing
+  const simulateAIModelEvent = () => {
+    console.log("Simulate AI Event button clicked!"); // Debug log
+    // Random event types and descriptions
+    const eventTypes = [
+      { type: "weapon", description: "Weapon detected" },
+      { type: "gunshot", description: "Gunshot detected" },
+      { type: "suspicious_behavior", description: "Suspicious behavior detected" },
+      { type: "unauthorized_access", description: "Unauthorized access detected" },
+      { type: "violence", description: "Violence detected" },
+      { type: "threat", description: "Threat detected" }
+    ];
 
-    const AIOutput = await detectDiseasesWithAI(
-      publicUrlData.publicUrl,
-      expandedCrop.plant_type
-    );
+    const severities: ("low" | "medium" | "high")[] = ["low", "medium", "high"];
+    const randomSeverity = severities[Math.floor(Math.random() * severities.length)];
+    const randomEvent = eventTypes[Math.floor(Math.random() * eventTypes.length)];
+    
+    // Generate realistic scores based on severity
+    let baseScore = 0;
+    if (randomSeverity === "high") baseScore = 75 + Math.random() * 25;
+    else if (randomSeverity === "medium") baseScore = 50 + Math.random() * 25;
+    else baseScore = 25 + Math.random() * 25;
 
-    console.log(AIOutput);
-    setExpandedCrop({
-      ...expandedCrop,
-      disease_status: AIOutput,
-      image_url: publicUrlData.publicUrl,
+    const videoScore = Math.max(0, Math.min(100, baseScore + (Math.random() - 0.5) * 20));
+    const audioScore = Math.max(0, Math.min(100, baseScore + (Math.random() - 0.5) * 20));
+    const combinedScore = (videoScore + audioScore) / 2;
+
+    // Generate random detection data
+    const detections = Array.from({ length: Math.floor(Math.random() * 3) + 1 }, (_, i) => ({
+      type: randomEvent.type,
+      confidence: Math.max(0, Math.min(100, baseScore + (Math.random() - 0.5) * 15)),
+      bbox: [
+        Math.floor(Math.random() * 400) + 50,
+        Math.floor(Math.random() * 300) + 50,
+        Math.floor(Math.random() * 200) + 100,
+        Math.floor(Math.random() * 150) + 100
+      ],
+      timestamp: new Date(Date.now() - Math.random() * 5000).toISOString(),
+      frame_id: Math.floor(Math.random() * 1000) + i
+    }));
+
+    const mockAIEvent: AIModelEvent = {
+      event_id: `evt_${Math.random().toString(36).substr(2, 12)}`,
+      camera_id: `cam_${Math.floor(Math.random() * 6) + 1}`,
+      event_start: new Date().toISOString(),
+      event_end: new Date(Date.now() + Math.random() * 10000 + 2000).toISOString(),
+      combined_score: Math.round(combinedScore * 10) / 10,
+      scores: {
+        video: Math.round(videoScore * 10) / 10,
+        audio: Math.round(audioScore * 10) / 10,
+      },
+      detections: detections,
+      severity: randomSeverity,
+    };
+
+    console.log("Generated AI Event:", mockAIEvent);
+    handleAIModelEvent(mockAIEvent);
+  };
+
+  const simulateIncomingEvent = () => {
+    console.log("Simulate button clicked"); // Debug log
+    const cams = [
+      "Camera 1",
+      "Camera 2",
+      "Camera 3",
+      "Camera 4",
+      "Camera 5",
+      "Camera 6",
+    ];
+    const types = ["Weapon detected", "Gunshot heard"];
+    const ev: SecurityEvent = {
+      id: `${Date.now()}`,
+      camera: cams[Math.floor(Math.random() * cams.length)],
+      detected: types[Math.floor(Math.random() * types.length)],
+      timestamp: new Date().toLocaleString(),
+      status: "live",
+    };
+    console.log("Creating event:", ev); // Debug log
+    setLiveEvents((prev) => {
+      const newEvents = [ev, ...prev];
+      console.log("Updated live events:", newEvents); // Debug log
+      return newEvents;
     });
-
-    setCropAILoading(false);
-
-    toast({ title: "Image uploaded!" });
-  };
-
-  const detectDiseaseDuringNewCrop = async (publicUrlData: {
-    publicUrl: string;
-  }) => {
-    setCropAILoading(true);
-
-    const AIOutput = await detectDiseasesWithAI(
-      publicUrlData.publicUrl,
-      newCrop.plant_type
-    );
-
-    console.log(AIOutput);
-    setNewCrop({
-      ...newCrop,
-      disease_status: AIOutput,
-      image_url: publicUrlData.publicUrl,
+    toast({ 
+      title: "New security event", 
+      description: `${ev.detected} • ${ev.camera}`,
+      variant: "default"
     });
-
-    setCropAILoading(false);
-
-    toast({ title: "Image uploaded!" });
   };
 
-  // Handler for deleting a crop
-  const handleDeleteCrop = async (cropId: string) => {
-    if (
-      !confirm(
-        "Are you sure you want to delete this crop? This action cannot be undone."
-      )
-    ) {
-      return;
-    }
-
-    setDeletingCropId(cropId);
-    try {
-      const { error } = await supabase
-        .from("saved_crops")
-        .delete()
-        .eq("id", cropId);
-
-      if (error) throw error;
-
-      // Remove the crop from local state
-      setSavedCrops((prevCrops) =>
-        prevCrops.filter((crop) => crop.id !== cropId)
-      );
-
-      if (expandedFarm) {
-        setExpandedFarm({
-          ...expandedFarm,
-          crop_ids: expandedFarm.crop_ids.filter(
-            (crop_ID) => crop_ID !== cropId
-          ),
-        });
-      }
-
-      // Close expanded crop modal if it's the one being deleted
-      if (expandedCrop?.id === cropId) {
-        setExpandedCrop(null);
-      }
-
-      toast({ title: "Crop deleted successfully!" });
-    } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error occurred";
-      toast({
-        title: "Error deleting crop",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    } finally {
-      setDeletingCropId(null);
-    }
+  const approveEvent = (id: string) => {
+    const ev = liveEvents.find((e) => e.id === id);
+    if (!ev) return;
+    toast({ title: "Calling principal…" });
+    setTimeout(() => toast({ title: "Calling police station…" }), 500);
+    setLiveEvents((prev) => prev.filter((e) => e.id !== id));
+    setPastEvents((prev) => [{ ...ev, status: "accepted" }, ...prev]);
   };
 
-  // Handler for crop form submit
-  const handleCropSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setUploading(true);
-    try {
-      const { data, error } = await supabase
-        .from("saved_crops")
-        .insert([
-          {
-            user_id: user.id,
-            crop_name: newCrop.crop_name,
-            image_url: newCrop.image_url,
-            date_planted: newCrop.date_planted,
-            plant_type: newCrop.plant_type,
-            location: newCrop.location,
-            growth_season: newCrop.growth_season,
-            harvest_time: newCrop.harvest_time,
-            notes: newCrop.notes,
-          },
-        ])
-        .select();
-
-      if (expandedFarm) {
-        setExpandedFarm({
-          ...expandedFarm,
-          crop_ids: expandedFarm.crop_ids
-            ? [...expandedFarm.crop_ids, data[0].id]
-            : [data[0].id],
-        });
-      }
-
-      if (error) throw error;
-      toast({ title: "Crop saved!" });
-      setShowCropModal(false);
-      setNewCrop({});
-      setLoadingCrops(true);
-      // Refetch crops
-      const savedCropData = await supabase
-        .from("saved_crops")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
-      const formattedCrops = (savedCropData.data || []).map(
-        (crop: SavedCrop) => ({
-          id: crop.id,
-          crop_name: crop.crop_name,
-          image_url: crop.image_url,
-          date_planted: crop.date_planted,
-          plant_type: crop.plant_type,
-          location: crop.location,
-          growth_season: crop.growth_season,
-          harvest_time: crop.harvest_time,
-          disease_status: crop.disease_status,
-          notes: crop.notes || undefined,
-        })
-      );
-      setSavedCrops(formattedCrops);
-    } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error occurred";
-      toast({
-        title: "Error saving crop",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    } finally {
-      setUploading(false);
-    }
-  };
-  const handleFarmSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setUploading(true);
-    try {
-      const { data, error } = await supabase
-        .from("saved_farms")
-        .insert([
-          {
-            user_id: user.id,
-            farm_name: newFarm.farm_name,
-            image_url: newFarm.image_url,
-            date_created: newFarm.date_created,
-            farm_type: newFarm.farm_type,
-            location_id: newFarm.location_id,
-            crop_ids: newFarm.crop_ids,
-            notes: newFarm.notes,
-          },
-        ])
-        .select();
-      if (error) throw error;
-      toast({ title: "Farm saved!" });
-      setShowFarmModal(false);
-
-      setSavedFarms([...savedFarms, data[0]]);
-
-      setNewFarm({});
-    } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error occurred";
-      toast({
-        title: "Error saving farm",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    } finally {
-      setUploading(false);
-    }
+  const rejectEvent = (id: string) => {
+    const ev = liveEvents.find((e) => e.id === id);
+    if (!ev) return;
+    setLiveEvents((prev) => prev.filter((e) => e.id !== id));
+    setPastEvents((prev) => [{ ...ev, status: "rejected" }, ...prev]);
   };
 
-  // Handler for editing a crop
-  const handleEditCrop = async (
-    updatedCrop: Partial<SavedCrop> & { id: string }
-  ) => {
-    setUploading(true);
-    try {
-      const { error } = await supabase
-        .from("saved_crops")
-        .update(updatedCrop)
-        .eq("id", updatedCrop.id);
-      if (error) throw error;
-      toast({ title: "Crop updated!" });
-      setExpandedCrop(null);
-      // Refetch crops
-      const { data } = await supabase
-        .from("saved_crops")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
-      const formattedCrops = (data || []).map((crop: SavedCrop) => ({
-        id: crop.id,
-        crop_name: crop.crop_name,
-        image_url: crop.image_url,
-        date_planted: crop.date_planted,
-        plant_type: crop.plant_type,
-        location: crop.location,
-        growth_season: crop.growth_season,
-        harvest_time: crop.harvest_time,
-        disease_status: crop.disease_status,
-        notes: crop.notes || undefined,
-      }));
-      setSavedCrops(formattedCrops);
-    } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error occurred";
-      toast({
-        title: "Error updating crop",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  // Handler for editing a crop
-  const handleEditFarm = async (
-    updatedFarm: Partial<SavedFarm> & { id: string }
-  ) => {
-    setUploading(true);
-    try {
-      const { location, ...farmWithoutLocation } = updatedFarm;
-
-      //delete updatedFarmCopy.location;
-
-      const { error } = await supabase
-        .from("saved_farms")
-        .update(farmWithoutLocation)
-        .eq("id", farmWithoutLocation.id);
-      if (error) throw error;
-      toast({ title: "Farm updated!" });
-      setExpandedFarm(null);
-      // Refetch farms
-      const { data } = await supabase
-        .from("saved_farms")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
-      let formattedFarms = (data || []).map((farm: SavedFarm) => ({
-        id: farm.id,
-        farm_name: farm.farm_name,
-        image_url: farm.image_url,
-        date_created: farm.date_created,
-        farm_type: farm.farm_type,
-        location_id: farm.location_id,
-        crop_ids: farm.crop_ids,
-        notes: farm.notes || undefined,
-      }));
-
-      if (formattedFarms.length > 0 && savedLocations.length > 0) {
-        formattedFarms.forEach((currFarm) => {
-          savedLocations.forEach((currLocation) => {
-            if (currFarm.location_id == currLocation.id) {
-              formattedFarms = formattedFarms.map((farm) =>
-                farm.id === currFarm.id
-                  ? { ...farm, location: currLocation.location }
-                  : farm
-              );
-            }
-          });
-        });
-      }
-
-      setSavedFarms(formattedFarms);
-    } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error occurred";
-      toast({
-        title: "Error updating farm",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  // Add this handler for image upload
-  const handleCropImageUpload = async (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = e.target.files?.[0];
-    if (!file || !user) return;
-    setUploading(true);
-    try {
-      const fileExt = file.name.split(".").pop();
-      const filePath = `crops/${user.id}/${Date.now()}.${fileExt}`;
-      const { data, error } = await supabase.storage
-        .from("crop-images")
-        .upload(filePath, file);
-      if (error) throw error;
-      const { data: publicUrlData } = supabase.storage
-        .from("crop-images")
-        .getPublicUrl(filePath);
-
-      detectDiseaseDuringNewCrop(publicUrlData);
-    } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error occurred";
-      toast({
-        title: "Image upload failed",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  // Add this handler for image upload
-  const handleFarmImageUpload = async (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = e.target.files?.[0];
-    if (!file || !user) return;
-    setUploading(true);
-    try {
-      const fileExt = file.name.split(".").pop();
-      const filePath = `farms/${user.id}/${Date.now()}.${fileExt}`;
-      const { data, error } = await supabase.storage
-        .from("crop-images")
-        .upload(filePath, file);
-      if (error) throw error;
-      const { data: publicUrlData } = supabase.storage
-        .from("crop-images")
-        .getPublicUrl(filePath);
-      setNewFarm({ ...newFarm, image_url: publicUrlData.publicUrl });
-      toast({ title: "Image uploaded!" });
-    } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error occurred";
-      toast({
-        title: "Image upload failed",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  // Show loader while checking auth or loading data
   if (loading || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center pt-16">
@@ -770,1256 +331,608 @@ export default function AccountPage() {
     );
   }
 
-  function convertBlobToBase64(blob: Blob): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onerror = reject;
-      reader.onload = () => resolve(reader.result as string);
-      reader.readAsDataURL(blob);
-    });
-  }
-
-  // Main AI detection logic
-  const detectDiseasesWithAI = async (
-    image_URL: string,
-    cropType: string | null
-  ): Promise<string | null> => {
-    try {
-      // Fetch image and convert to Blob
-      const imageResponse = await fetch(image_URL);
-      // Convert Blob to File (required for browser-image-compression)
-      const imageBlob = await imageResponse.blob();
-      const imageFile = new File([imageBlob], "image.jpg", {
-        type: imageBlob.type,
-      });
-
-      // Determine size based on cropType
-      const isCassava = cropType?.toLowerCase().includes("cassava");
-      const maxWidth = isCassava ? 800 : 224;
-      const maxHeight = isCassava ? 600 : 224;
-
-      // Resize and compress
-      const compressedBlob = await imageCompression(imageFile, {
-        maxWidthOrHeight: Math.max(maxWidth, maxHeight),
-        useWebWorker: true,
-        fileType: "image/jpeg",
-      });
-
-      // Convert to base64
-      let base64data = await convertBlobToBase64(compressedBlob);
-
-      if (!base64data) {
-        console.error("Failed to convert image to base64.");
-        return;
-      }
-
-      base64data = base64data.split(",")[1];
-
-      // Send the request to the AI backend
-      if (!cropType.toLowerCase().includes("cassava")) {
-        // General AI endpoint
-        let AIResponse;
-        const response = await fetch(
-          "http://10.0.0.81:5000/get-general-disease-AI",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              image: base64data, // your encoded image string
-            }),
-          }
-        );
-
-        return response.json();
-      } else {
-        // Casava AI endpoint
-        let AIResponse;
-        const response = await fetch("http://10.0.0.81:5000/get-casava-AI", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            image: base64data,
-          }),
-        });
-
-        return response.json();
-      }
-    } catch (error) {
-      console.log(error);
-      return null;
-    }
-  };
-
   return (
-    <div className="min-h-screen pt-20">
-      <section className="py-12">
-        <div className="neurocrop-container">
+    <main className="bg-black text-white min-h-screen">
+      <section className="bg-gradient-to-b from-[#1f2022] to-[#171819] py-16 md:py-24 overflow-hidden">
+        <div className="mx-auto max-w-8xl px-8">
           <motion.div
-            className="max-w-4xl mx-auto"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
+            ref={headerRef}
+            initial="hidden"
+            animate={isHeaderInView ? "visible" : "hidden"}
+            variants={fadeInUpVariants}
+            className="flex items-center justify-between mb-12"
           >
-            {/* Header and sign out button */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
-              <div>
-                <h1 className="text-3xl font-bold tracking-tight mb-2">
-                  Your NeuroCrop Account
-                </h1>
-                <p className="text-muted-foreground">
-                  View and manage your saved crop recommendations and analyses.
-                </p>
+            <div className="text-left">
+              <div className="inline-flex items-center gap-2 rounded-full border border-blue-500/20 bg-blue-500/10 px-4 py-1.5 mb-6">
+                <Shield className="h-4 w-4 text-blue-400" />
+                <span className="text-sm font-medium text-blue-300">Security Dashboard</span>
               </div>
-              <Button onClick={signOut} variant="outline">
+              <h1 className="text-3xl md:text-5xl font-bold tracking-tight mb-4 bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-transparent">
+                Monitor & Respond
+              </h1>
+              <p className="text-lg md:text-xl text-zinc-300 max-w-3xl leading-relaxed mb-[-20px]">
+                Real-time security monitoring with AI-powered threat detection and instant escalation.
+              </p>
+            </div>
+            <div className="flex items-center gap-4">
+              <Button 
+                onClick={signOut} 
+                variant="outline" 
+                className="rounded-full border border-white/20 px-6 py-2 text-base font-medium hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/40 transition-all"
+              >
                 Sign Out
               </Button>
             </div>
+          </motion.div>
 
-            {/* Account info card */}
-            <div className="bg-card rounded-xl border border-border/50 p-6 mb-8">
-              <h2 className="text-xl font-medium mb-2">Account Information</h2>
-              <p className="text-muted-foreground mb-1">Email: {user.email}</p>
-              <p className="text-muted-foreground">
-                Member since: {new Date(user.created_at).toLocaleDateString()}
-              </p>
-            </div>
+          <motion.div
+            ref={mainContentRef}
+            initial="hidden"
+            animate={isMainContentInView ? "visible" : "hidden"}
+            variants={staggerContainer}
+            className="grid grid-cols-1 lg:grid-cols-[minmax(14rem,18rem)_1fr_minmax(20rem,26rem)] gap-8 lg:gap-12 items-start"
+          >
+            <motion.aside variants={cardVariants} className="w-full">
+              <Card className="group relative rounded-2xl border border-white/10 bg-zinc-900/40 p-6 backdrop-blur hover:border-blue-500/30 transition-colors">
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl" />
+                <nav className="flex lg:flex-col gap-3 relative z-10">
+                  <button 
+                    className={cn(
+                      "w-full text-left px-4 py-3 text-sm rounded-xl transition-all duration-300 hover-scale relative overflow-hidden group/nav",
+                      subTab === "feed"
+                        ? "text-blue-400 font-medium bg-blue-500/10"
+                        : "text-zinc-300 hover:text-white hover:bg-white/5"
+                    )} 
+                    onClick={() => setSubTab("feed")}
+                  >
+                    <span className="inline-flex items-center gap-3 relative z-10">
+                      <Video className="w-5 h-5" /> 
+                      <span>Feed</span>
+                    </span>
+                    {subTab === "feed" && (
+                      <motion.div 
+                        className="absolute inset-0 bg-blue-500/20 rounded-xl z-0" 
+                        layoutId="activeSubNavBg" 
+                        transition={{ type: "spring", duration: 0.6 }} 
+                      />
+                    )}
+                  </button>
+                  <button 
+                    className={cn(
+                      "w-full text-left px-4 py-3 text-sm rounded-xl transition-all duration-300 hover-scale relative overflow-hidden group/nav",
+                      subTab === "live"
+                        ? "text-blue-400 font-medium bg-blue-500/10"
+                        : "text-zinc-300 hover:text-white hover:bg-white/5"
+                    )} 
+                    onClick={() => setSubTab("live")}
+                  >
+                    <span className="inline-flex items-center gap-3 relative z-10">
+                      <Camera className="w-5 h-5" /> 
+                      <span>Live Camera</span>
+                    </span>
+                    {subTab === "live" && (
+                      <motion.div 
+                        className="absolute inset-0 bg-blue-500/20 rounded-xl z-0" 
+                        layoutId="activeSubNavBg" 
+                        transition={{ type: "spring", duration: 0.6 }} 
+                      />
+                    )}
+                  </button>
+                  <button 
+                    className={cn(
+                      "w-full text-left px-4 py-3 text-sm rounded-xl transition-all duration-300 hover-scale relative overflow-hidden group/nav",
+                      subTab === "sos"
+                        ? "text-red-400 font-medium bg-red-500/10"
+                        : "text-zinc-300 hover:text-white hover:bg-white/5"
+                    )} 
+                    onClick={() => setSubTab("sos")}
+                  >
+                    <span className="inline-flex items-center gap-3 relative z-10">
+                      <AlertTriangle className="w-5 h-5" /> 
+                      <span>Emergency SOS</span>
+                    </span>
+                    {subTab === "sos" && (
+                      <motion.div 
+                        className="absolute inset-0 bg-red-500/20 rounded-xl z-0" 
+                        layoutId="activeSubNavBg" 
+                        transition={{ type: "spring", duration: 0.6 }} 
+                      />
+                    )}
+                  </button>
+                </nav>
+                <div className="mt-6 relative z-20">
+                  <Button 
+                    size="sm" 
+                    className="w-full rounded-xl bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 text-blue-300 hover:text-blue-200 transition-all relative z-20 pointer-events-auto" 
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      console.log("Button click event fired!");
+                      simulateAIModelEvent();
+                    }}
+                    type="button"
+                  >
+                    <Zap className="w-4 h-4 mr-2" />
+                    Simulate AI Event
+                  </Button>
+                </div>
+              </Card>
+            </motion.aside>
 
-            {/* Saved Farms header and add button */}
-            <div className="flex items-center justify-between mb-6 mt-12">
-              <h2 className="text-2xl font-bold">Your Saved Farms</h2>
-              <Button asChild size="sm">
-                <a href="/map-tool">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Farm
-                </a>
-              </Button>
-            </div>
-            {/* Saved farms list or loading/empty state */}
-            {loadingFarms ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-6 h-6 animate-spin text-primary mr-2" />
-                <span>Loading your saved farms...</span>
-              </div>
-            ) : savedFarms.length > 0 ? (
-              <div className="grid grid-cols-1 gap-4">
-                {savedFarms.map((farm, index) => (
+            <motion.main variants={cardVariants} className="flex-1 min-w-0">
+              {subTab === "feed" && (
+                <div>
+                  <h2 className="text-2xl font-semibold mb-2 text-white">Security Feeds</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {Array.from({ length: 6 }).map((_, i) => (
+                      <motion.div
+                        key={i}
+                        variants={cardVariants}
+                        className="group relative rounded-2xl border border-white/10 bg-zinc-900/40 p-8 backdrop-blur hover:border-blue-500/30 transition-all duration-300 h-80 cursor-pointer hover:scale-105"
+                        onClick={() => setExpandedCamera(i)}
+                      >
+                        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl" />
+                        <div className="absolute inset-0 flex items-center justify-center text-zinc-400 group-hover:text-zinc-300 transition-colors">
+                          <div className="text-center">
+                            <Eye className="w-12 h-12 mx-auto mb-3" />
+                            <span className="text-lg font-medium">Camera {i + 1} feed</span>
+                            <p className="text-sm text-zinc-500 mt-2">Click to expand</p>
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {subTab === "live" && (
+                <div>
+                  <h2 className="text-2xl font-semibold mb-6 text-white">Live Camera</h2>
+                  <Card className="group relative rounded-2xl border border-white/10 bg-zinc-900/40 backdrop-blur hover:border-blue-500/30 transition-colors overflow-hidden min-h-[18rem] lg:min-h-[24rem]">
+                    <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl" />
+                    <video
+                      ref={videoRef}
+                      className="w-full h-full object-contain bg-black rounded-2xl"
+                      autoPlay
+                      muted
+                      playsInline
+                    />
+                    <div className="absolute top-4 right-4 flex gap-2">
+                      <Button 
+                        size="sm" 
+                        className="rounded-xl bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 text-blue-300 hover:text-blue-200 transition-all" 
+                        onClick={startCamera} 
+                        disabled={camStarting || !!streamRef.current}
+                      >
+                        {camStarting ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <Camera className="w-4 h-4 mr-2" />
+                        )}
+                        {camStarting ? "Starting..." : "Start"}
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        className="rounded-xl bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-300 hover:text-red-200 transition-all" 
+                        onClick={stopCamera} 
+                        disabled={!streamRef.current}
+                      >
+                        <X className="w-4 h-4 mr-2" />
+                        Stop
+                      </Button>
+                    </div>
+                  </Card>
+                </div>
+              )}
+
+              {subTab === "sos" && (
+                <div className="flex flex-col items-center justify-center gap-6 py-12">
                   <motion.div
-                    key={farm.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.4, delay: index * 0.1 }}
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ duration: 0.5 }}
                     className="relative"
                   >
-                    <Card className="overflow-hidden hover:shadow-md transition-shadow flex items-center gap-4 min-h-[96px]">
-                      <div
-                        className="flex-shrink-0 w-24 h-24 flex items-center justify-center bg-muted rounded-lg overflow-hidden border ml-2"
-                        onClick={() => {
-                          setExpandedFarm(farm);
-                          setFarmEditMode(false);
-                        }}
-                      >
-                        {farm.image_url ? (
-                          <img
-                            src={farm.image_url}
-                            alt={farm.farm_name}
-                            className="object-cover w-full h-full cursor-pointer"
-                          />
-                        ) : (
-                          <span className="text-xs text-muted-foreground">
-                            No Image
-                          </span>
-                        )}
-                      </div>
-                      <div
-                        className="p-4 flex-1 min-w-0 cursor-pointer"
-                        onClick={() => {
-                          setExpandedFarm(farm);
-                          setFarmEditMode(false);
-                        }}
-                      >
-                        <h3 className="text-lg font-medium mb-1 truncate">
-                          {farm.farm_name}
-                        </h3>
-                        <div className="flex items-center text-sm text-muted-foreground">
-                          <span className="mr-2 truncate">
-                            Type: {farm.farm_type}
-                          </span>
-                        </div>
-                        <div className="flex items-center text-sm text-muted-foreground">
-                          <span className="truncate">
-                            Location: ({farm.location})
-                          </span>
-                        </div>
-                        <div className="flex items-center text-sm text-muted-foreground">
-                          <span>
-                            Date Created:{" "}
-                            {farm.date_created
-                              ? new Date(farm.date_created).toLocaleDateString()
-                              : "-"}
-                          </span>
-                        </div>
-                      </div>
-                    </Card>
-                  </motion.div>
-                ))}
-              </div>
-            ) : (
-              <div className="bg-muted/50 rounded-xl border border-border/50 p-8 text-center">
-                <p className="text-muted-foreground mb-4">
-                  You haven't saved any farms yet.
-                </p>
-                <Button asChild>
-                  <a href="/map-tool">Add Your First Farm</a>
-                </Button>
-              </div>
-            )}
-
-            {/* Farm Modal */}
-            {showAddFarmModal && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-                <div className="bg-white dark:bg-zinc-900 rounded-xl p-8 w-full max-w-md shadow-lg relative">
-                  <button
-                    className="absolute top-1 right-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
-                    onClick={() => setShowFarmModal(false)}
-                  >
-                    ×
-                  </button>
-                  <h3 className="text-xl font-bold mb-4">Add a Farm</h3>
-                  <form onSubmit={handleFarmSubmit} className="space-y-3">
-                    <input
-                      className="w-full border rounded px-3 py-2"
-                      placeholder="Farm Name"
-                      required
-                      value={newFarm.farm_name || ""}
-                      onChange={(e) =>
-                        setNewFarm({ ...newFarm, farm_name: e.target.value })
-                      }
-                    />
-                    <div className="mb-2">
-                      <div className="flex gap-2 mb-2">
-                        <button
-                          type="button"
-                          className={`px-3 py-1 rounded ${
-                            imageInputMode === "upload"
-                              ? "bg-primary text-white"
-                              : "bg-muted"
-                          }`}
-                          onClick={() => setImageInputMode("upload")}
-                        >
-                          Upload
-                        </button>
-                        <button
-                          type="button"
-                          className={`px-3 py-1 rounded ${
-                            imageInputMode === "link"
-                              ? "bg-primary text-white"
-                              : "bg-muted"
-                          }`}
-                          onClick={() => setImageInputMode("link")}
-                        >
-                          Image Link
-                        </button>
-                      </div>
-                      {imageInputMode === "upload" ? (
-                        <label className="block cursor-pointer border-dashed border-2 border-primary rounded-lg p-4 text-center hover:bg-primary/10 transition">
-                          <span className="block mb-2 text-primary font-medium">
-                            Click to upload image
-                          </span>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={handleFarmImageUpload}
-                          />
-                        </label>
-                      ) : (
-                        <input
-                          className="w-full border rounded px-3 py-2"
-                          placeholder="Paste image URL"
-                          value={newFarm.image_url || ""}
-                          onChange={(e) =>
-                            setNewFarm({
-                              ...newFarm,
-                              image_url: e.target.value,
-                            })
-                          }
-                        />
-                      )}
-                      {newFarm.image_url && (
-                        <img
-                          src={newFarm.image_url}
-                          alt="Farm"
-                          className="w-24 h-24 object-cover rounded-lg border mt-2 mx-auto"
-                        />
-                      )}
+                    <AlertTriangle className="w-16 h-16 text-red-400" />
+                    <div className="absolute inset-0 animate-ping">
+                      <AlertTriangle className="w-16 h-16 text-red-400/30" />
                     </div>
-                    <input
-                      className="w-full border rounded px-3 py-2"
-                      type="date"
-                      placeholder="Date Created"
-                      value={newFarm.date_created || ""}
-                      onChange={(e) => {
-                        console.log(e.target.value);
-                        setNewFarm({
-                          ...newFarm,
-                          date_created: e.target.value,
-                        });
+                  </motion.div>
+                  <h2 className="text-3xl font-semibold text-white">Emergency SOS</h2>
+                  <p className="text-zinc-400 text-center max-w-md">
+                    Use only in genuine emergencies. This will immediately notify school administration and law enforcement.
+                  </p>
+                  <Button
+                    size="lg"
+                    className="bg-red-600 hover:bg-red-700 text-white px-8 py-6 text-lg rounded-full transition-all hover:scale-105 shadow-lg shadow-red-500/25"
+                    onClick={() => {
+                      if (confirm("Trigger Emergency SOS? This will notify principal and police.")) {
+                        toast({ title: "SOS triggered", description: "Notifying principal…" });
+                        setTimeout(() => toast({ title: "Notifying police station…" }), 600);
+                      }
+                    }}
+                  >
+                    <AlertTriangle className="w-6 h-6 mr-3" />
+                    Send SOS
+                  </Button>
+                  <p className="text-sm text-zinc-500">Use only in emergencies.</p>
+                </div>
+              )}
+            </motion.main>
+
+            <motion.aside variants={cardVariants} className="w-full">
+              <Card className="group relative rounded-2xl border border-white/10 bg-zinc-900/40 p-6 backdrop-blur hover:border-blue-500/30 transition-colors">
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl" />
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-semibold text-white">Security Events</h3>
+                  <Bell className="w-5 h-5 text-blue-400" />
+                </div>
+                <Tabs value={eventsTab} onValueChange={(v) => setEventsTab(v as "live" | "past")} className="w-full">
+                  <TabsList className="relative grid grid-cols-2 gap-2 p-1 items-center bg-transparent backdrop-blur-md border border-border/30 rounded-full shadow-lg w-auto h-full">
+                    <motion.div
+                      className="absolute top-1 bottom-1 bg-blue-500/20 rounded-full"
+                      layout
+                      transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                      style={{
+                        width: `calc(50% - 4px)`,
+                        left: eventsTab === "live" ? "4px" : `calc(50% + 1px)`,
                       }}
                     />
-                    <input
-                      className="w-full border rounded px-3 py-2"
-                      placeholder="Type of Farm"
-                      value={newFarm.farm_type || ""}
-                      onChange={(e) =>
-                        setNewFarm({ ...newFarm, farm_type: e.target.value })
-                      }
-                    />
-                    <input
-                      className="w-full border rounded px-3 py-2"
-                      placeholder="Location"
-                      value={newFarm.location || ""}
-                      disabled={true}
-                    />
-                    <textarea
-                      className="w-full border rounded px-3 py-2"
-                      placeholder="Notes (optional)"
-                      value={newFarm.notes || ""}
-                      onChange={(e) =>
-                        setNewFarm({ ...newFarm, notes: e.target.value })
-                      }
-                    />
-                    <Button
-                      type="submit"
-                      className="w-full"
-                      disabled={uploading}
+                    <TabsTrigger 
+                      value="live" 
+                      className="relative px-3 py-2 text-sm rounded-lg data-[state=active]:bg-transparent text-white data-[state=active]:text-white"
                     >
-                      {uploading ? (
-                        <Loader2 className="w-4 h-4 animate-spin inline-block mr-2" />
-                      ) : null}
-                      Save Farm
-                    </Button>
-                  </form>
-                </div>
-              </div>
-            )}
-
-            {/* Expanded Farm modal */}
-            {expandedFarm && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-                <div className="bg-white dark:bg-zinc-900 rounded-2xl p-10 w-full max-w-3xl shadow-2xl relative flex flex-col md:flex-row gap-10 min-h-[400px]">
-                  <button
-                    className="absolute top-1 right-3 text-zinc-500 hover:text-zinc-900 dark:hover:text-white text-2xl"
-                    onClick={() => setExpandedFarm(null)}
-                    aria-label="Close"
-                  >
-                    ×
-                  </button>
-                  <div className="flex flex-col items-center justify-center w-full md:w-1/2">
-                    {expandedFarm.image_url ? (
-                      <div>
-                        <img
-                          src={expandedFarm.image_url}
-                          alt={expandedFarm.farm_name}
-                          className="w-full max-w-xs h-64 object-cover rounded-xl border mb-4"
-                        />
-                        {editFarmMode && (
-                          <div>
-                            <div
-                              style={{
-                                height: "230px",
-                                overflowY: "auto",
-                                marginTop: "20px",
-                                marginBottom: "20px",
-                              }}
-                            >
-                              <div style={{ marginBottom: "10px" }}>
-                                <h2 className="text-xl font-bold">Crops:</h2>
-                              </div>
-                              {savedCrops.map(
-                                (crop, index) =>
-                                  expandedFarm.crop_ids &&
-                                  expandedFarm.crop_ids.includes(crop.id) && (
-                                    <motion.div
-                                      key={crop.id}
-                                      initial={{ opacity: 0, y: 20 }}
-                                      animate={{ opacity: 1, y: 0 }}
-                                      transition={{
-                                        duration: 0.4,
-                                        delay: index * 0.1,
-                                      }}
-                                    >
-                                      <Card className="overflow-hidden hover:shadow-md transition-shadow flex items-center gap-4 min-h-[96px] mb-1">
-                                        <div className="flex-shrink-0 w-24 h-24 flex items-center justify-center bg-muted rounded-lg overflow-hidden border">
-                                          {/* Delete button */}
-                                          <button
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleDeleteCrop(crop.id);
-                                            }}
-                                            disabled={
-                                              deletingCropId === crop.id
-                                            }
-                                            className="absolute p-1 rounded-full bg-red-500 hover:bg-red-600 text-white transition-colors z-10"
-                                            style={{
-                                              marginLeft: 500,
-                                              marginBottom: 66,
-                                            }}
-                                            title="Delete crop"
-                                          >
-                                            {deletingCropId === crop.id ? (
-                                              <Loader2 className="w-4 h-4 animate-spin" />
-                                            ) : (
-                                              <Trash2 className="w-4 h-4" />
-                                            )}
-                                          </button>
-                                          {crop.image_url ? (
-                                            <img
-                                              src={crop.image_url}
-                                              alt={crop.crop_name}
-                                              className="object-cover w-full h-full"
-                                            />
-                                          ) : (
-                                            <span className="text-xs text-muted-foreground">
-                                              No Image
-                                            </span>
-                                          )}
-                                        </div>
-                                        <div
-                                          style={{
-                                            padding: "16px",
-                                            width: "200px",
-                                          }}
-                                        >
-                                          <h3 className="text-lg font-medium mb-1 truncate">
-                                            {crop.crop_name}
-                                          </h3>
-                                        </div>
-                                      </Card>
-                                    </motion.div>
-                                  )
-                              )}
-                            </div>
-                            <div>
-                              <Button
-                                size="lg"
-                                onClick={() => setShowCropModal(true)}
-                              >
-                                <Plus className="mr-2 h-4 w-4" />
-                                Add Crop
-                              </Button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="w-full max-w-xs h-64 flex items-center justify-center bg-muted rounded-xl border mb-4 text-muted-foreground">
-                        No Image
-                      </div>
-                    )}
-                    {!editFarmMode && (
-                      <div className="text-center text-muted-foreground text-xs">
-                        Added:{" "}
-                        {expandedFarm.date_created
-                          ? new Date(
-                              expandedFarm.date_created
-                            ).toLocaleDateString()
-                          : "-"}
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex-1 flex flex-col gap-2">
-                    <div className="flex justify-between items-start mb-2">
-                      <h2 className="text-2xl font-bold mb-2">
-                        {expandedFarm.farm_name}
-                      </h2>
-                      {!editFarmMode && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setFarmEditMode(true)}
-                        >
-                          Edit
-                        </Button>
-                      )}
-                    </div>
-                    {editFarmMode ? (
-                      <form
-                        className="space-y-3"
-                        onSubmit={(e) => {
-                          e.preventDefault();
-                          handleEditFarm(expandedFarm);
-                          setFarmEditMode(false);
-                        }}
-                      >
-                        {/* Delete button */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteFarm(expandedFarm.id);
-                          }}
-                          disabled={deletingFarmId === expandedFarm.id}
-                          className="absolute top-2 left-2 p-1 rounded-full bg-red-500 hover:bg-red-600 text-white transition-colors z-10"
-                          title="Delete farm"
-                        >
-                          {deletingFarmId === expandedFarm.id ? (
-                            <Loader2 className="w-5 h-5 animate-spin" />
-                          ) : (
-                            <Trash2 className="w-5 h-5" />
-                          )}
-                        </button>
-                        <input
-                          className="w-full border rounded px-3 py-2 font-bold text-xl"
-                          value={expandedFarm.farm_name}
-                          onChange={(e) =>
-                            setExpandedFarm({
-                              ...expandedFarm,
-                              farm_name: e.target.value,
-                            })
-                          }
-                        />
-                        <div className="mb-2">
-                          <div className="flex gap-2 mb-2">
-                            <button
-                              type="button"
-                              className={`px-3 py-1 rounded ${
-                                imageInputMode === "upload"
-                                  ? "bg-primary text-white"
-                                  : "bg-muted"
-                              }`}
-                              onClick={() => setImageInputMode("upload")}
-                            >
-                              Upload
-                            </button>
-                            <button
-                              type="button"
-                              className={`px-3 py-1 rounded ${
-                                imageInputMode === "link"
-                                  ? "bg-primary text-white"
-                                  : "bg-muted"
-                              }`}
-                              onClick={() => setImageInputMode("link")}
-                            >
-                              Image Link
-                            </button>
-                          </div>
-                          {imageInputMode === "upload" ? (
-                            <label className="block cursor-pointer border-dashed border-2 border-primary rounded-lg p-4 text-center hover:bg-primary/10 transition">
-                              <span className="block mb-2 text-primary font-medium">
-                                Click or drag to upload image
-                              </span>
-                              <input
-                                type="file"
-                                accept="image/*"
-                                className="hidden"
-                                onChange={async (e) => {
-                                  const file = e.target.files?.[0];
-                                  if (!file || !user) return;
-                                  setUploading(true);
-                                  try {
-                                    const fileExt = file.name.split(".").pop();
-                                    const filePath = `farms/${
-                                      user.id
-                                    }/${Date.now()}.${fileExt}`;
-                                    const { data, error } =
-                                      await supabase.storage
-                                        .from("crop-images")
-                                        .upload(filePath, file);
-                                    if (error) throw error;
-                                    const { data: publicUrlData } =
-                                      supabase.storage
-                                        .from("crop-images")
-                                        .getPublicUrl(filePath);
-                                    setExpandedFarm({
-                                      ...expandedFarm,
-                                      image_url: publicUrlData.publicUrl,
-                                    });
-                                    toast({ title: "Image uploaded!" });
-                                  } catch (error: unknown) {
-                                    const errorMessage =
-                                      error instanceof Error
-                                        ? error.message
-                                        : "Unknown error occurred";
-                                    toast({
-                                      title: "Image upload failed",
-                                      description: errorMessage,
-                                      variant: "destructive",
-                                    });
-                                  } finally {
-                                    setUploading(false);
-                                  }
-                                }}
-                              />
-                            </label>
-                          ) : (
-                            <input
-                              className="w-full border rounded px-3 py-2"
-                              placeholder="Paste image URL"
-                              value={expandedFarm.image_url || ""}
-                              onChange={(e) =>
-                                setExpandedFarm({
-                                  ...expandedFarm,
-                                  image_url: e.target.value,
-                                })
-                              }
-                            />
-                          )}
-                          {expandedFarm.image_url && (
-                            <img
-                              src={expandedFarm.image_url}
-                              alt="Farm"
-                              className="w-24 h-24 object-cover rounded-lg border mt-2 mx-auto"
-                            />
-                          )}
+                      <span className="relative z-10">Live</span>
+                    </TabsTrigger>
+                    <TabsTrigger 
+                      value="past" 
+                      className="relative px-3 py-2 text-sm rounded-lg data-[state=active]:bg-transparent text-white data-[state=active]:text-white"
+                    >
+                      <span className="relative z-10">Past</span>
+                    </TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="live">
+                    <div className="mt-6 space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+                      {liveEvents.length === 0 ? (
+                        <div className="text-center py-8">
+                          <Bell className="w-8 h-8 text-zinc-500 mx-auto mb-3" />
+                          <div className="text-sm text-zinc-400">No live events</div>
+                          <div className="text-xs text-zinc-500 mt-1">All clear for now</div>
                         </div>
-                        <input
-                          className="w-full border rounded px-3 py-2"
-                          value={expandedFarm.farm_type}
-                          onChange={(e) =>
-                            setExpandedFarm({
-                              ...expandedFarm,
-                              farm_type: e.target.value,
-                            })
-                          }
-                        />
-                        <input
-                          className="w-full border rounded px-3 py-2"
-                          type="date"
-                          value={expandedFarm.date_created}
-                          onChange={(e) =>
-                            setExpandedFarm({
-                              ...expandedFarm,
-                              date_created: e.target.value,
-                            })
-                          }
-                        />
-                        <textarea
-                          className="w-full border rounded px-3 py-2"
-                          value={expandedFarm.notes || ""}
-                          onChange={(e) =>
-                            setExpandedFarm({
-                              ...expandedFarm,
-                              notes: e.target.value,
-                            })
-                          }
-                        />
-                        <div className="flex gap-2">
-                          <Button
-                            type="submit"
-                            className="w-full"
-                            disabled={uploading}
-                          >
-                            {uploading ? (
-                              <Loader2 className="w-4 h-4 animate-spin inline-block mr-2" />
-                            ) : null}
-                            Save Changes
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="w-full"
-                            onClick={() => setFarmEditMode(false)}
-                          >
-                            Cancel
-                          </Button>
-                        </div>
-                      </form>
-                    ) : (
-                      <div>
-                        <div className="space-y-2">
-                          <div className="text-lg font-semibold">
-                            {expandedFarm.farm_name}
-                          </div>
-                          <div className="text-muted-foreground">
-                            {expandedFarm.farm_type}
-                          </div>
-                          <div className="text-muted-foreground">
-                            Location: {expandedFarm.location}
-                          </div>
-                          <div className="text-muted-foreground">
-                            Date Planted:{" "}
-                            {expandedFarm.date_created
-                              ? new Date(
-                                  expandedFarm.date_created
-                                ).toLocaleDateString()
-                              : "-"}
-                          </div>
-                          {expandedFarm.notes && (
-                            <div className="mt-2">
-                              Notes: {expandedFarm.notes}
-                            </div>
-                          )}
-                        </div>
-                        <div
-                          style={{
-                            height: "170px",
-                            overflowY: "auto",
-                            marginTop: "10px",
-                          }}
-                        >
-                          {savedCrops.map(
-                            (crop, index) =>
-                              expandedFarm.crop_ids &&
-                              expandedFarm.crop_ids.includes(crop.id) && (
-                                <motion.div
-                                  key={crop.id}
-                                  initial={{ opacity: 0, y: 20 }}
-                                  animate={{ opacity: 1, y: 0 }}
-                                  transition={{
-                                    duration: 0.4,
-                                    delay: index * 0.1,
-                                  }}
-                                  onClick={() => {
-                                    setExpandedCrop(crop);
-                                    setCropEditMode(false);
-                                  }}
-                                  className="cursor-pointer"
-                                >
-                                  <Card
-                                    style={{ width: 350 }}
-                                    className="overflow-hidden hover:shadow-md transition-shadow flex items-center gap-4 min-h-[96px]"
-                                  >
-                                    <div className="flex-shrink-0 w-24 h-24 flex items-center justify-center bg-muted rounded-lg overflow-hidden border ml-2">
-                                      {crop.image_url ? (
-                                        <img
-                                          src={crop.image_url}
-                                          alt={crop.crop_name}
-                                          className="object-cover w-full h-full"
-                                        />
-                                      ) : (
-                                        <span className="text-xs text-muted-foreground">
-                                          No Image
+                      ) : (
+                        liveEvents.map((ev) => {
+                          const severityColor = ev.severity === "high" ? "red" : ev.severity === "medium" ? "orange" : "blue";
+                          const severityBg = ev.severity === "high" ? "red-500/10" : ev.severity === "medium" ? "orange-500/10" : "blue-500/10";
+                          const severityBorder = ev.severity === "high" ? "red-500/30" : ev.severity === "medium" ? "orange-500/30" : "blue-500/30";
+                          
+                          return (
+                            <motion.div
+                              key={ev.id}
+                              initial={{ opacity: 0, y: 20 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -20 }}
+                              className={`group relative rounded-xl border border-white/10 bg-zinc-800/40 p-4 backdrop-blur hover:border-${severityColor}-500/30 transition-colors`}
+                            >
+                              <div className={`absolute inset-0 bg-gradient-to-br from-${severityColor}-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-xl`} />
+                              <div className="flex items-start justify-between gap-3 mb-4">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <div className="font-medium text-white">{ev.detected}</div>
+                                    {ev.severity && (
+                                      <span className={`text-xs px-2 py-1 rounded-full font-medium bg-${severityBg} text-${severityColor}-300 border border-${severityBorder}`}>
+                                        {ev.severity.toUpperCase()}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-sm text-zinc-400">{ev.camera} • {ev.timestamp}</div>
+                                  {ev.combined_score && (
+                                    <div className="text-xs text-zinc-500 mt-1">
+                                      Confidence: {ev.combined_score.toFixed(1)}% 
+                                      {ev.scores && (
+                                        <span className="ml-2">
+                                          (Video: {ev.scores.video.toFixed(1)}%, Audio: {ev.scores.audio.toFixed(1)}%)
                                         </span>
                                       )}
                                     </div>
-                                    <div className="p-4 flex-1 min-w-0">
-                                      <h3 className="text-lg font-medium mb-1 truncate">
-                                        {crop.crop_name}
-                                      </h3>
-                                      <div className="flex items-center text-sm text-muted-foreground mb-1">
-                                        <span className="mr-2 truncate">
-                                          Type: {crop.plant_type}
-                                        </span>
-                                      </div>
-                                      <div className="flex items-center text-sm text-muted-foreground">
-                                        <span>
-                                          Date Planted:{" "}
-                                          {crop.date_planted
-                                            ? new Date(
-                                                crop.date_planted
-                                              ).toLocaleDateString()
-                                            : "-"}
-                                        </span>
-                                      </div>
-                                      <div className="flex items-center text-sm text-muted-foreground mb-1">
-                                        <span
-                                          className="mr-2 truncate mt-1"
-                                          style={{
-                                            backgroundColor: crop.disease_status
-                                              ? crop.disease_status.includes(
-                                                  "Healthy"
-                                                )
-                                                ? "#53FF5399"
-                                                : "#FF4545"
-                                              : "#00000022",
-                                            borderRadius: 20,
-                                            paddingTop: 3,
-                                            paddingBottom: 3,
-                                            paddingLeft: 7,
-                                            paddingRight: 7,
-                                            color: "black",
-                                            textOverflow: "ellipsis",
-                                          }}
-                                        >
-                                          Status:{" "}
-                                          {crop.disease_status
-                                            ? crop.disease_status
-                                                .toLowerCase()
-                                                .includes("healthy")
-                                              ? "Healthy"
-                                              : crop.disease_status
-                                            : "Unknown"}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  </Card>
-                                </motion.div>
-                              )
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Expanded crop modal */}
-            {expandedCrop && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-                <div className="bg-white dark:bg-zinc-900 rounded-2xl p-10 w-full max-w-3xl shadow-2xl relative flex flex-col md:flex-row gap-10 min-h-[400px]">
-                  <button
-                    className="absolute top-1 right-3 text-zinc-500 hover:text-zinc-900 dark:hover:text-white text-2xl"
-                    onClick={() => setExpandedCrop(null)}
-                    aria-label="Close"
-                  >
-                    ×
-                  </button>
-                  <div className="flex flex-col items-center justify-center w-full md:w-1/2">
-                    {expandedCrop.image_url ? (
-                      <img
-                        src={expandedCrop.image_url}
-                        alt={expandedCrop.crop_name}
-                        className="w-full max-w-xs h-64 object-cover rounded-xl border mb-4"
-                      />
-                    ) : (
-                      <div className="w-full max-w-xs h-64 flex items-center justify-center bg-muted rounded-xl border mb-4 text-muted-foreground">
-                        No Image
-                      </div>
-                    )}
-                    {!editCropMode && (
-                      <div className="text-center text-muted-foreground text-xs">
-                        Added:{" "}
-                        {expandedCrop.date_planted
-                          ? new Date(
-                              expandedCrop.date_planted
-                            ).toLocaleDateString()
-                          : "-"}
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex-1 flex flex-col gap-2">
-                    <div className="flex justify-between items-start mb-2">
-                      <h2 className="text-2xl font-bold mb-2">
-                        {expandedCrop.crop_name}
-                      </h2>
-                      {!editCropMode && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setCropEditMode(true)}
-                        >
-                          Edit
-                        </Button>
-                      )}
-                    </div>
-                    {editCropMode ? (
-                      <form
-                        className="space-y-3"
-                        onSubmit={(e) => {
-                          e.preventDefault();
-                          handleEditCrop(expandedCrop);
-                          setCropEditMode(false);
-                        }}
-                      >
-                        {/* Delete button */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteCrop(expandedCrop.id);
-                          }}
-                          disabled={deletingCropId === expandedCrop.id}
-                          className="absolute top-2 left-2 p-1 rounded-full bg-red-500 hover:bg-red-600 text-white transition-colors z-10"
-                          title="Delete crop"
-                        >
-                          {deletingCropId === expandedCrop.id ? (
-                            <Loader2 className="w-5 h-5 animate-spin" />
-                          ) : (
-                            <Trash2 className="w-5 h-5" />
-                          )}
-                        </button>
-                        <input
-                          className="w-full border rounded px-3 py-2 font-bold text-xl"
-                          value={expandedCrop.crop_name}
-                          onChange={(e) =>
-                            setExpandedCrop({
-                              ...expandedCrop,
-                              crop_name: e.target.value,
-                            })
-                          }
-                        />
-                        <div className="mb-2">
-                          <div className="flex gap-2 mb-2">
-                            <button
-                              type="button"
-                              className={`px-3 py-1 rounded ${
-                                imageInputMode === "upload"
-                                  ? "bg-primary text-white"
-                                  : "bg-muted"
-                              }`}
-                              onClick={() => setImageInputMode("upload")}
-                            >
-                              Upload
-                            </button>
-                            <button
-                              type="button"
-                              className={`px-3 py-1 rounded ${
-                                imageInputMode === "link"
-                                  ? "bg-primary text-white"
-                                  : "bg-muted"
-                              }`}
-                              onClick={() => setImageInputMode("link")}
-                            >
-                              Image Link
-                            </button>
-                          </div>
-                          {imageInputMode === "upload" ? (
-                            <label className="block cursor-pointer border-dashed border-2 border-primary rounded-lg p-4 text-center hover:bg-primary/10 transition">
-                              <span className="block mb-2 text-primary font-medium">
-                                Click or drag to upload image
-                              </span>
-                              <input
-                                type="file"
-                                accept="image/*"
-                                className="hidden"
-                                onChange={async (e) => {
-                                  const file = e.target.files?.[0];
-                                  if (!file || !user) return;
-                                  setUploading(true);
-                                  try {
-                                    const fileExt = file.name.split(".").pop();
-                                    const filePath = `crops/${
-                                      user.id
-                                    }/${Date.now()}.${fileExt}`;
-                                    const { data, error } =
-                                      await supabase.storage
-                                        .from("crop-images")
-                                        .upload(filePath, file);
-                                    if (error) throw error;
-                                    const { data: publicUrlData } =
-                                      supabase.storage
-                                        .from("crop-images")
-                                        .getPublicUrl(filePath);
-
-                                    detectDiseaseDuringEdit(publicUrlData);
-                                  } catch (error: unknown) {
-                                    const errorMessage =
-                                      error instanceof Error
-                                        ? error.message
-                                        : "Unknown error occurred";
-                                    toast({
-                                      title: "Image upload failed",
-                                      description: errorMessage,
-                                      variant: "destructive",
-                                    });
-                                  } finally {
-                                    setUploading(false);
-                                  }
-                                }}
-                              />
-                            </label>
-                          ) : (
-                            <input
-                              className="w-full border rounded px-3 py-2"
-                              placeholder="Paste image URL"
-                              value={expandedCrop.image_url || ""}
-                              onChange={(e) =>
-                                setExpandedCrop({
-                                  ...expandedCrop,
-                                  image_url: e.target.value,
-                                })
-                              }
-                            />
-                          )}
-                          {expandedCrop.image_url && (
-                            <img
-                              src={expandedCrop.image_url}
-                              alt="Crop"
-                              className="w-24 h-24 object-cover rounded-lg border mt-2 mx-auto"
-                            />
-                          )}
-                        </div>
-                        <input
-                          className="w-full border rounded px-3 py-2"
-                          value={expandedCrop.plant_type}
-                          onChange={(e) =>
-                            setExpandedCrop({
-                              ...expandedCrop,
-                              plant_type: e.target.value,
-                            })
-                          }
-                        />
-                        <input
-                          className="w-full border rounded px-3 py-2"
-                          type="date"
-                          value={expandedCrop.date_planted}
-                          onChange={(e) =>
-                            setExpandedCrop({
-                              ...expandedCrop,
-                              date_planted: e.target.value,
-                            })
-                          }
-                        />
-                        <input
-                          className="w-full border rounded px-3 py-2"
-                          value={expandedCrop.growth_season}
-                          onChange={(e) =>
-                            setExpandedCrop({
-                              ...expandedCrop,
-                              growth_season: e.target.value,
-                            })
-                          }
-                        />
-                        <input
-                          className="w-full border rounded px-3 py-2"
-                          value={expandedCrop.harvest_time}
-                          onChange={(e) =>
-                            setExpandedCrop({
-                              ...expandedCrop,
-                              harvest_time: e.target.value,
-                            })
-                          }
-                        />
-                        <textarea
-                          className="w-full border rounded px-3 py-2"
-                          value={expandedCrop.notes || ""}
-                          onChange={(e) =>
-                            setExpandedCrop({
-                              ...expandedCrop,
-                              notes: e.target.value,
-                            })
-                          }
-                        />
-                        <div className="flex gap-2">
-                          <Button
-                            type="submit"
-                            className="w-full"
-                            disabled={uploading || cropAILoading}
-                          >
-                            {uploading || cropAILoading ? (
-                              <Loader2 className="w-4 h-4 animate-spin inline-block mr-2" />
-                            ) : null}
-                            Save Changes
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="w-full"
-                            onClick={() => setCropEditMode(false)}
-                          >
-                            Cancel
-                          </Button>
-                        </div>
-                      </form>
-                    ) : (
-                      <div className="space-y-2">
-                        <div className="text-lg font-semibold">
-                          {expandedCrop.crop_name}
-                        </div>
-                        <div className="text-muted-foreground">
-                          {expandedCrop.plant_type}
-                        </div>
-                        <div className="text-muted-foreground">
-                          Growth Season: {expandedCrop.growth_season}
-                        </div>
-                        <div className="text-muted-foreground">
-                          Harvest Time: {expandedCrop.harvest_time}
-                        </div>
-                        <div className="text-muted-foreground">
-                          Date Planted:{" "}
-                          {expandedCrop.date_planted
-                            ? new Date(
-                                expandedCrop.date_planted
-                              ).toLocaleDateString()
-                            : "-"}
-                        </div>
-                        {expandedCrop.notes && (
-                          <div className="mt-2">
-                            Notes: {expandedCrop.notes}
-                          </div>
-                        )}
-                        <div className="flex items-center text-sm text-muted-foreground mb-1">
-                          <span
-                            className="mr-2 truncate font-semibold"
-                            style={{
-                              backgroundColor: expandedCrop.disease_status
-                                ? expandedCrop.disease_status.includes(
-                                    "Healthy"
-                                  )
-                                  ? "#53FF5399"
-                                  : "#FF4545"
-                                : "#00000022",
-                              borderRadius: 20,
-                              paddingTop: 3,
-                              paddingBottom: 3,
-                              paddingLeft: 7,
-                              paddingRight: 7,
-                              color: "black",
-                            }}
-                          >
-                            Status:{" "}
-                            {expandedCrop.disease_status
-                              ? expandedCrop.disease_status
-                                  .toLowerCase()
-                                  .includes("healthy")
-                                ? "Healthy"
-                                : expandedCrop.disease_status
-                              : "Unknown"}
-                          </span>
-                          <a
-                            className="mr-2 truncate"
-                            style={{
-                              color: "blue",
-                            }}
-                            href={
-                              diseaseWebsites[expandedCrop.disease_status]
-                                ? diseaseWebsites[expandedCrop.disease_status]
-                                : ""
-                            }
-                            target="_blank"
-                          >
-                            Learn more...
-                          </a>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-            {/* Crop Modal */}
-            {showCropModal && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-                <div className="bg-white dark:bg-zinc-900 rounded-xl p-8 w-full max-w-md shadow-lg relative">
-                  <button
-                    className="absolute top-1 right-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
-                    onClick={() => setShowCropModal(false)}
-                  >
-                    ×
-                  </button>
-                  <h3 className="text-xl font-bold mb-4">Add a Crop</h3>
-                  <form onSubmit={handleCropSubmit} className="space-y-3">
-                    <input
-                      className="w-full border rounded px-3 py-2"
-                      placeholder="Crop Name"
-                      required
-                      value={newCrop.crop_name || ""}
-                      onChange={(e) =>
-                        setNewCrop({ ...newCrop, crop_name: e.target.value })
-                      }
-                    />
-                    <div className="mb-2">
-                      <div className="flex gap-2 mb-2">
-                        <button
-                          type="button"
-                          className={`px-3 py-1 rounded ${
-                            imageInputMode === "upload"
-                              ? "bg-primary text-white"
-                              : "bg-muted"
-                          }`}
-                          onClick={() => setImageInputMode("upload")}
-                        >
-                          Upload
-                        </button>
-                        <button
-                          type="button"
-                          className={`px-3 py-1 rounded ${
-                            imageInputMode === "link"
-                              ? "bg-primary text-white"
-                              : "bg-muted"
-                          }`}
-                          onClick={() => setImageInputMode("link")}
-                        >
-                          Image Link
-                        </button>
-                      </div>
-                      {imageInputMode === "upload" ? (
-                        <label className="block cursor-pointer border-dashed border-2 border-primary rounded-lg p-4 text-center hover:bg-primary/10 transition">
-                          <span className="block mb-2 text-primary font-medium">
-                            Click to upload image
-                          </span>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={handleCropImageUpload}
-                          />
-                        </label>
-                      ) : (
-                        <input
-                          className="w-full border rounded px-3 py-2"
-                          placeholder="Paste image URL"
-                          value={newCrop.image_url || ""}
-                          onChange={(e) =>
-                            setNewCrop({
-                              ...newCrop,
-                              image_url: e.target.value,
-                            })
-                          }
-                        />
-                      )}
-                      {newCrop.image_url && (
-                        <img
-                          src={newCrop.image_url}
-                          alt="Crop"
-                          className="w-24 h-24 object-cover rounded-lg border mt-2 mx-auto"
-                        />
-                      )}
-                    </div>
-                    <input
-                      className="w-full border rounded px-3 py-2"
-                      type="date"
-                      placeholder="Date Planted"
-                      value={newCrop.date_planted || ""}
-                      onChange={(e) =>
-                        setNewCrop({ ...newCrop, date_planted: e.target.value })
-                      }
-                    />
-                    <input
-                      className="w-full border rounded px-3 py-2"
-                      placeholder="Type of Plant"
-                      value={newCrop.plant_type || ""}
-                      onChange={(e) =>
-                        setNewCrop({ ...newCrop, plant_type: e.target.value })
-                      }
-                    />
-                    <input
-                      className="w-full border rounded px-3 py-2"
-                      placeholder="Growth Season"
-                      value={newCrop.growth_season || ""}
-                      onChange={(e) =>
-                        setNewCrop({
-                          ...newCrop,
-                          growth_season: e.target.value,
+                                  )}
+                                </div>
+                                <div className={`w-2 h-2 bg-${severityColor}-400 rounded-full animate-pulse`} />
+                              </div>
+                              <div className="grid grid-cols-2 gap-3">
+                                <Button 
+                                  variant="outline" 
+                                  onClick={() => rejectEvent(ev.id)} 
+                                  className="rounded-lg bg-red-500/10 hover:bg-red-500/20 border-red-500/30 text-red-300 hover:text-red-200 transition-all"
+                                >
+                                  <X className="w-4 h-4 mr-2" /> 
+                                  Reject
+                                </Button>
+                                <Button 
+                                  onClick={() => approveEvent(ev.id)} 
+                                  className="rounded-lg bg-blue-500/20 hover:bg-blue-500/30 border-blue-500/30 text-blue-300 hover:text-blue-200 transition-all"
+                                >
+                                  <Check className="w-4 h-4 mr-2" /> 
+                                  Approve
+                                </Button>
+                              </div>
+                            </motion.div>
+                          );
                         })
-                      }
-                    />
-                    <input
-                      className="w-full border rounded px-3 py-2"
-                      placeholder="Harvest Time"
-                      value={newCrop.harvest_time || ""}
-                      onChange={(e) =>
-                        setNewCrop({ ...newCrop, harvest_time: e.target.value })
-                      }
-                    />
-                    <textarea
-                      className="w-full border rounded px-3 py-2"
-                      placeholder="Notes (optional)"
-                      value={newCrop.notes || ""}
-                      onChange={(e) =>
-                        setNewCrop({ ...newCrop, notes: e.target.value })
-                      }
-                    />
-                    <Button
-                      type="submit"
-                      className="w-full"
-                      disabled={uploading || cropAILoading}
-                    >
-                      {uploading || cropAILoading ? (
-                        <Loader2 className="w-4 h-4 animate-spin inline-block mr-2" />
-                      ) : null}
-                      Save Crop
-                    </Button>
-                  </form>
-                </div>
-              </div>
-            )}
+                      )}
+                    </div>
+                  </TabsContent>
+                  <TabsContent value="past">
+                    <div className="mt-6 space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+                      {pastEvents.length === 0 ? (
+                        <div className="text-center py-8">
+                          <Clock className="w-8 h-8 text-zinc-500 mx-auto mb-3" />
+                          <div className="text-sm text-zinc-400">No past events</div>
+                          <div className="text-xs text-zinc-500 mt-1">Event history will appear here</div>
+                        </div>
+                      ) : (
+                        pastEvents.map((ev) => (
+                          <motion.div
+                            key={ev.id}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="group relative rounded-xl border border-white/10 bg-zinc-800/40 p-4 backdrop-blur hover:border-zinc-500/30 transition-colors"
+                          >
+                            <div className="absolute inset-0 bg-gradient-to-br from-zinc-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-xl" />
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1">
+                                <div className="font-medium text-white mb-1">{ev.detected}</div>
+                                <div className="text-sm text-zinc-400">{ev.camera} • {ev.timestamp}</div>
+                              </div>
+                              <span
+                                className={`text-xs px-3 py-1 rounded-full font-medium ${
+                                  ev.status === "accepted"
+                                    ? "bg-green-500/20 text-green-300 border border-green-500/30"
+                                    : "bg-red-500/20 text-red-300 border border-red-500/30"
+                                }`}
+                              >
+                                {ev.status === "accepted" ? "Accepted" : "Rejected"}
+                              </span>
+                            </div>
+                          </motion.div>
+                        ))
+                      )}
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              </Card>
+            </motion.aside>
           </motion.div>
         </div>
       </section>
-    </div>
+
+      {/* High Severity Popup */}
+      {showHighSeverityPopup && highSeverityEvent && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setShowHighSeverityPopup(false)}
+        >
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.8, opacity: 0 }}
+            className="relative w-full h-full max-w-7xl max-h-[80vh] bg-gradient-to-br from-red-900/20 to-red-800/10 border border-red-500/30 rounded-3xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="absolute top-0 left-0 right-0 bg-gradient-to-r from-red-600/20 to-red-500/20 backdrop-blur-md border-b border-red-500/30 p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center">
+                    <AlertTriangle className="w-6 h-6 text-red-400 animate-pulse" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold text-white">🚨 HIGH SEVERITY ALERT</h2>
+                    <p className="text-red-300">Immediate action required</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowHighSeverityPopup(false)}
+                  className="w-10 h-10 bg-red-500/20 hover:bg-red-500/30 rounded-full flex items-center justify-center text-red-300 hover:text-white transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="pt-24 p-8 h-full overflow-y-auto">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-full">
+                {/* Event Details */}
+                <div className="space-y-6">
+                  <div className="bg-zinc-900/40 rounded-2xl p-6 border border-red-500/20">
+                    <h3 className="text-xl font-semibold text-white mb-4">Event Details</h3>
+                    <div className="space-y-3">
+                      <div className="flex justify-between">
+                        <span className="text-zinc-400">Detection:</span>
+                        <span className="text-white font-medium">{highSeverityEvent.detected}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-zinc-400">Camera:</span>
+                        <span className="text-white font-medium">{highSeverityEvent.camera}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-zinc-400">Timestamp:</span>
+                        <span className="text-white font-medium">{highSeverityEvent.timestamp}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-zinc-400">Event ID:</span>
+                        <span className="text-white font-mono text-sm">{highSeverityEvent.event_id}</span>
+                      </div>
+                      {highSeverityEvent.combined_score && (
+                        <div className="flex justify-between">
+                          <span className="text-zinc-400">Confidence:</span>
+                          <span className="text-red-400 font-bold">{highSeverityEvent.combined_score.toFixed(1)}%</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Scores Breakdown */}
+                  {highSeverityEvent.scores && (
+                    <div className="bg-zinc-900/40 rounded-2xl p-6 border border-red-500/20">
+                      <h3 className="text-xl font-semibold text-white mb-4">Detection Scores</h3>
+                      <div className="space-y-4">
+                        <div>
+                          <div className="flex justify-between mb-2">
+                            <span className="text-zinc-400">Video Analysis</span>
+                            <span className="text-white font-medium">{highSeverityEvent.scores.video.toFixed(1)}%</span>
+                          </div>
+                          <div className="w-full bg-zinc-700 rounded-full h-2">
+                            <div 
+                              className="bg-red-500 h-2 rounded-full transition-all duration-500"
+                              style={{ width: `${highSeverityEvent.scores.video}%` }}
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <div className="flex justify-between mb-2">
+                            <span className="text-zinc-400">Audio Analysis</span>
+                            <span className="text-white font-medium">{highSeverityEvent.scores.audio.toFixed(1)}%</span>
+                          </div>
+                          <div className="w-full bg-zinc-700 rounded-full h-2">
+                            <div 
+                              className="bg-red-500 h-2 rounded-full transition-all duration-500"
+                              style={{ width: `${highSeverityEvent.scores.audio}%` }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Actions */}
+                  <div className="space-y-4">
+                    <Button
+                      size="lg"
+                      className="w-full bg-red-600 hover:bg-red-700 text-white py-4 text-lg rounded-xl"
+                      onClick={() => {
+                        approveEvent(highSeverityEvent.id);
+                        setShowHighSeverityPopup(false);
+                      }}
+                    >
+                      <Check className="w-5 h-5 mr-2" />
+                      CONFIRM THREAT - ESCALATE NOW
+                    </Button>
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      className="w-full border-red-500/30 text-red-300 hover:bg-red-500/10 py-4 text-lg rounded-xl"
+                      onClick={() => {
+                        rejectEvent(highSeverityEvent.id);
+                        setShowHighSeverityPopup(false);
+                      }}
+                    >
+                      <X className="w-5 h-5 mr-2" />
+                      FALSE ALARM - DISMISS
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Live Feed Simulation */}
+                <div className="bg-zinc-900/40 rounded-2xl p-6 border border-red-500/20">
+                  <h3 className="text-xl font-semibold text-white mb-4">Live Camera Feed</h3>
+                  <div className="relative bg-black rounded-xl h-64 flex items-center justify-center">
+                    <div className="text-center">
+                      <Camera className="w-16 h-16 text-red-400 mx-auto mb-4 animate-pulse" />
+                      <p className="text-red-300 font-medium">Live Feed from {highSeverityEvent.camera}</p>
+                      <p className="text-zinc-500 text-sm mt-2">Weapon detection in progress...</p>
+                    </div>
+                    {/* Simulated detection overlay */}
+                    <div className="absolute top-4 left-4 bg-red-600/90 text-white px-3 py-1 rounded-full text-sm font-medium animate-pulse">
+                      WEAPON DETECTED
+                    </div>
+                    <div className="absolute bottom-4 right-4 bg-red-600/90 text-white px-3 py-1 rounded-full text-sm font-medium">
+                      LIVE
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+
+      {/* Camera Feed Full-Screen Popup */}
+      {expandedCamera !== null && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black/95 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setExpandedCamera(null)}
+        >
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.8, opacity: 0 }}
+            className="relative w-full h-full max-w-7xl max-h-[90vh] bg-zinc-900 rounded-3xl border border-white/20 overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="absolute top-0 left-0 right-0 bg-gradient-to-r from-blue-600/20 to-blue-500/20 backdrop-blur-md border-b border-blue-500/30 p-4 z-10">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-blue-500/20 rounded-full flex items-center justify-center">
+                    <Camera className="w-5 h-5 text-blue-400" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-white">Camera {expandedCamera + 1} Feed</h2>
+                    <p className="text-blue-300">Live Security Feed</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setExpandedCamera(null)}
+                  className="w-8 h-8 bg-zinc-800 hover:bg-zinc-700 rounded-full flex items-center justify-center text-white transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Camera Feed Content */}
+            <div className="pt-16 h-full flex items-center justify-center bg-black">
+              <div className="relative w-full h-full max-w-5xl max-h-[70vh] bg-zinc-800 rounded-2xl border border-white/10 flex items-center justify-center">
+                <div className="text-center">
+                  <Eye className="w-24 h-24 mx-auto mb-6 text-blue-400 animate-pulse" />
+                  <h3 className="text-3xl font-bold text-white mb-2">Camera {expandedCamera + 1} Feed</h3>
+                  <p className="text-xl text-zinc-400 mb-4">Live Security Feed</p>
+                  <div className="flex items-center justify-center gap-2 mb-6">
+                    <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+                    <span className="text-sm text-red-400 font-medium">LIVE</span>
+                  </div>
+                  <div className="text-sm text-zinc-500">
+                    <p>Resolution: 1920x1080</p>
+                    <p>FPS: 30</p>
+                    <p>Status: Active</p>
+                  </div>
+                </div>
+                {/* Simulated camera overlay elements */}
+                <div className="absolute top-4 left-4 bg-red-600/90 text-white px-3 py-1 rounded-full text-sm font-medium animate-pulse">
+                  LIVE FEED
+                </div>
+                <div className="absolute top-4 right-4 bg-green-600/90 text-white px-3 py-1 rounded-full text-sm font-medium">
+                  REC
+                </div>
+                <div className="absolute bottom-4 left-4 bg-black/50 text-white px-3 py-1 rounded text-sm">
+                  {new Date().toLocaleTimeString()}
+                </div>
+                <div className="absolute bottom-4 right-4 bg-black/50 text-white px-3 py-1 rounded text-sm">
+                  Camera {expandedCamera + 1}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </main>
   );
 }
+ 

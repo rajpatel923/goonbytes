@@ -1,16 +1,20 @@
 #!/bin/bash
 
-echo "Setting up Gun Detection..."
+# Setup script for Gun Detection System
+echo "Setting up Gun Detection System..."
 
-# Create virtual environment
+# Check if virtual environment exists
 if [ ! -d "venv" ]; then
-    echo "Creating virtual environment..."
+    echo "Creating virtual environment with Python 3.10..."
     /opt/homebrew/bin/python3.10 -m venv venv
 fi
 
-# Activate and install
+# Activate virtual environment
+echo "Activating virtual environment..."
 source venv/bin/activate
-echo "Installing dependencies..."
+
+# Install requirements
+echo "Installing requirements..."
 pip install -r requirements.txt
 
 echo "✅ Setup complete!"

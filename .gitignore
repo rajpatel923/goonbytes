@@ -61,3 +61,27 @@ node_modules/
 dist/
 build/
 *.egg-info/
+
+# Python ML model and checkpoint files (often large)
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.tflite
+weights/
+models/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS generated
+Icon?
+Desktop.ini
+
+# Misc
+*.so
+*.o
+*.sqlite3
+local_settings.py
+.env.*
+.secret
