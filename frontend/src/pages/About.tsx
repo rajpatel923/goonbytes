@@ -63,22 +63,22 @@ export default function About() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             <div className="flex justify-center">
               <div className="aspect-square w-full max-w-[300px] bg-muted rounded-2xl animate-pulse-gentle">
-                <img src="/placeholder.svg" alt="Team member" className="w-full h-full object-cover rounded-2xl" />
+                <img src="public/snapshots/arnav.jpg" alt="Team member" className="w-full h-full object-cover rounded-2xl" />
               </div>
             </div>
             <div className="flex justify-center">
               <div className="aspect-square w-full max-w-[300px] bg-muted rounded-2xl animate-pulse-gentle">
-                <img src="/placeholder.svg" alt="Team member" className="w-full h-full object-cover rounded-2xl" />
+                <img src="public/snapshots/chris.jpeg" alt="Team member" className="w-full h-full object-cover rounded-2xl" />
               </div>
             </div>
             <div className="flex justify-center">
               <div className="aspect-square w-full max-w-[300px] bg-muted rounded-2xl animate-pulse-gentle">
-                <img src="/placeholder.svg" alt="Team member" className="w-full h-full object-cover rounded-2xl" />
+                <img src="public/snapshots/fowwaz.jpeg" alt="Team member" className="w-full h-full object-cover rounded-2xl" />
               </div>
             </div>
             <div className="flex justify-center">
               <div className="aspect-square w-full max-w-[300px] bg-muted rounded-2xl animate-pulse-gentle">
-                <img src="/placeholder.svg" alt="Team member" className="w-full h-full object-cover rounded-2xl" />
+                <img src="public/snapshots/raj.jpeg" alt="Team member" className="w-full h-full object-cover rounded-2xl" />
               </div>
             </div>
           </div>
