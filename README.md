@@ -1,4 +1,4 @@
-# GoonBytes - AI-Powered Campus Security System
+# Vigilant - AI-Powered Campus Security System
 
 A comprehensive real-time security monitoring platform that uses AI to detect weapons and threats on campus, with automated notification systems for students and law enforcement.
 
