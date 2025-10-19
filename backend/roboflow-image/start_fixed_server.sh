@@ -4,21 +4,6 @@
 echo "🎥 Gun Detection Video Stream Server (Fixed)"
 echo "============================================="
 
-# Check if virtual environment exists
-if [ ! -d "venv" ]; then
-    echo "❌ Virtual environment not found!"
-    echo "Run ./setup.sh first to set up the environment"
-    exit 1
-fi
-
-# Check if .env file exists
-if [ ! -f ".env" ]; then
-    echo "❌ .env file not found!"
-    echo "Please create a .env file with your Roboflow API key:"
-    echo "echo 'ROBOFLOW_API_KEY=your_key_here' > .env"
-    exit 1
-fi
-
 # Activate virtual environment
 echo "🔧 Activating virtual environment..."
 source venv/bin/activate

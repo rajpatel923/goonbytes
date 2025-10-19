@@ -858,100 +858,65 @@ export default function AccountPage() {
     if (!ev) return;
     
     console.log("Approving event:", ev);
-    toast({ title: "Texting student and faculty...." });
-    const combinedScore = ev.combined_score ?? 0;
-    const evRecord = ev as Record<string, unknown>;
+    
+    // Helper functions for data transformation
     const asInt0to100 = (v: unknown) => {
-  let n = Number(v ?? 0);
-  // if it looks like 0..1, scale to 0..100
-  if (Number.isFinite(n) && n > 0 && n <= 1) n = n * 100;
-  // round & clamp
-  n = Math.round(n);
-  return Math.max(0, Math.min(100, n));
-};
+      let n = Number(v ?? 0);
+      if (Number.isFinite(n) && n > 0 && n <= 1) n = n * 100;
+      n = Math.round(n);
+      return Math.max(0, Math.min(100, n));
+    };
 
-const asFloat01 = (v: unknown) => {
-  let n = Number(v ?? 0);
-  // if it looks like a percent, normalize to 0..1
-  if (Number.isFinite(n) && n > 1) n = n / 100;
-  // clamp
-  n = Math.max(0, Math.min(1, n));
-  return Number(n.toFixed(4));
-};
+    const asFloat01 = (v: unknown) => {
+      let n = Number(v ?? 0);
+      if (Number.isFinite(n) && n > 1) n = n / 100;
+      n = Math.max(0, Math.min(1, n));
+      return Number(n.toFixed(4));
+    };
 
-const isoTime = (t: unknown) =>
-  typeof t === "string" && t.includes("T") ? t : new Date(t as any ?? Date.now()).toISOString();
+    const isoTime = (t: unknown) =>
+      typeof t === "string" && t.includes("T") ? t : new Date(t as any ?? Date.now()).toISOString();
 
-const threat_level =
-  ev.severity === "high" ? 100 :
-  ev.severity === "medium" ? 75 : 50;
+    const threat_level =
+      ev.severity === "high" ? 100 :
+      ev.severity === "medium" ? 75 : 50;
 
-const studentsPayload = {
-  audio_risk_level: asInt0to100(ev.scores?.audio),
-  image_risk_level: asInt0to100(ev.scores?.video),
-  threat_level,
-  timestamp: isoTime(ev.timestamp),
-  location: "Engineering Building, Room 204",
-  mixed_score: asFloat01(ev.combined_score), // ensures 0..1 and not undefined
-};
+    const studentsPayload = {
+      audio_risk_level: asInt0to100(ev.scores?.audio),
+      image_risk_level: asInt0to100(ev.scores?.video),
+      threat_level,
+      timestamp: isoTime(ev.timestamp),
+      location: "Engineering Building, Room 204",
+      mixed_score: asFloat01(ev.combined_score),
+    };
 
-const policePayload = {
-  video_link: "./test/security_footage.mp4",
-  threat_level,
-  timestamp: isoTime(ev.timestamp),
-  location: "Engineering Building, Room 20",
-  mixed_score: asFloat01(ev.combined_score ?? 0), // add fallback + normalize
-  notify: {
-    email: true,   // <-- boolean, not "True"
-    call: true     // <-- boolean, not "True"
-  }
-};
-    setTimeout(() => toast({ title: "Calling police station…" }), 5000);
+    const policePayload = {
+      video_link: "./test/security_footage.mp4",
+      threat_level,
+      timestamp: isoTime(ev.timestamp),
+      location: "Engineering Building, Room 20",
+      mixed_score: asFloat01(ev.combined_score ?? 0),
+      notify: {
+        email: true,
+        call: true
+      }
+    };
+
+    // Show initial toast
+    toast({ title: "Processing alert...", description: "Notifying authorities" });
 
     try {
-        // Notify students first (per request order)
-        try {
-          await axios.post("http://localhost:8092/v1/notify/students", studentsPayload);
-          toast({ title: "Students notified", description: "Student notifications sent successfully" });
-        } catch (err) {
-            console.error("[notify students] error:", err);
-            toast({ title: "Students notification failed", description: (err as any)?.message ?? "Failed to notify students", variant: "destructive" });
-        }
-        setTimeout(() => toast({ title: "Notifying police...", description: "Sending alert to local police station" }), 3000);
-        // Notify police
-        try {
-          await axios.post("http://localhost:8092/v1/notify/police", policePayload);
-          toast({ title: "Police notified", description: "Police notification sent successfully" });
-        } catch (err) {
-          console.error("[notify police] error:", err);
-          toast({ title: "Police notification failed", description: (err as any)?.message ?? "Failed to notify police", variant: "destructive" });
-        }
-    } catch (err) {
-      // Generic fallback (shouldn't be reached because inner try/catch handle each)
-      console.error("Notification error:", err);
-      toast({ title: "Notification error", description: (err as any)?.message ?? "Unknown error", variant: "destructive" });
-    } finally {
-      // Move event to past (accepted) and remove from liveEvents
-      setLiveEvents((prev) => prev.filter((e) => e.id !== id));
-      setPastEvents((prev) => [{ ...ev, status: "accepted" }, ...prev]);
-
-      // Optional sequential toasts to mimic previous behavior
-      toast({ title: "Texting student and faculty...." });
-      setTimeout(() => toast({ title: "Calling police station…" }), 500);
-    }
-
-    try {
-      // Update the event status in Supabase
-      const { error } = await supabase
+      // 1. Update Supabase first (optimistic UI update follows)
+      const { error: dbError } = await supabase
         .from('events')
         .update({ status: 'accepted' })
         .eq('id', id);
       
-      if (error) {
-        console.error('Error updating event status:', error);
+      if (dbError) {
+        console.error('Error updating event status:', dbError);
         toast({ 
-          title: "Error updating event", 
-          description: "Failed to update event status in database",
+          title: "Database Error", 
+          description: "Failed to update event status",
           variant: "destructive" 
         });
         return;
@@ -959,19 +924,79 @@ const policePayload = {
       
       console.log('Event status updated to accepted in Supabase');
       
-      // Update local state
+      // 2. Update local state immediately (optimistic update)
       setLiveEvents((prev) => prev.filter((e) => e.id !== id));
       setPastEvents((prev) => [{ ...ev, status: "accepted" }, ...prev]);
-      
+
+      // 3. Notify students
+      toast({ title: "Texting students and faculty..." });
+      try {
+        const studentsResponse = await axios.post(
+          "http://localhost:8092/v1/notify/students", 
+          studentsPayload,
+          {
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            timeout: 10000, // 10 second timeout
+          }
+        );
+        console.log('[notify students] success:', studentsResponse.data);
+        toast({ 
+          title: "Students notified", 
+          description: "Student notifications sent successfully" 
+        });
+      } catch (err: any) {
+        console.error("[notify students] error:", err);
+        const errorMsg = err.response?.data?.detail || err.message || "Failed to notify students";
+        toast({ 
+          title: "Students notification failed", 
+          description: errorMsg,
+          variant: "destructive" 
+        });
+      }
+
+      // 4. Notify police (with delay for UX)
+      setTimeout(async () => {
+        toast({ title: "Calling police station...", description: "Sending alert to local authorities" });
+        try {
+          const policeResponse = await axios.post(
+            "http://localhost:8092/v1/notify/police", 
+            policePayload,
+            {
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              timeout: 10000, // 10 second timeout
+            }
+          );
+          console.log('[notify police] success:', policeResponse.data);
+          toast({ 
+            title: "Police notified", 
+            description: "Police notification sent successfully" 
+          });
+        } catch (err: any) {
+          console.error("[notify police] error:", err);
+          const errorMsg = err.response?.data?.detail || err.message || "Failed to notify police";
+          toast({ 
+            title: "Police notification failed", 
+            description: errorMsg,
+            variant: "destructive" 
+          });
+        }
+      }, 2000);
+
+      // Final confirmation
       toast({ 
         title: "Event approved", 
         description: `${ev.detected} has been escalated` 
       });
-    } catch (err) {
+
+    } catch (err: any) {
       console.error('Error in approveEvent:', err);
       toast({ 
         title: "Error", 
-        description: "Failed to approve event",
+        description: err.message || "Failed to approve event",
         variant: "destructive" 
       });
     }
