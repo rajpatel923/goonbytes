@@ -123,7 +123,7 @@ export default function AccountPage() {
     "/videos/Camera 1.mp4",
     "/videos/Camera 2.mp4",
     "/videos/Camera 3.mp4",
-    "/videos/Camera 3.mp4",
+    "/videos/Camera 4.mp4",
   ];
 
   // Show animation for at least 1.2s, then allow video to appear only after loaded
