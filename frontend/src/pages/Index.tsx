@@ -207,7 +207,7 @@ export default function Index() {
               AI-Powered School Security
             </h2>
             <p className="text-lg md:text-xl text-zinc-300 max-w-3xl mx-auto leading-relaxed">
-              Aegis transforms your existing security infrastructure into an intelligent threat 
+              Vigilant transforms your existing security infrastructure into an intelligent threat 
               detection system that works around the clock to keep schools safe.
             </p>
             <MagicBento 
@@ -341,7 +341,7 @@ export default function Index() {
             <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-transparent to-transparent" />
             <div className="relative z-10">
               <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
-                Ready to See Aegis in Action?
+                Ready to See Vigilant in Action?
               </h2>
               <p className="text-lg text-zinc-300 max-w-2xl mx-auto mb-8">
                 Explore the dashboard, review live alerts, and experience rapid escalation flows 

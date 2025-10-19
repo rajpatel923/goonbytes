@@ -79,6 +79,11 @@ export default function AccountPage() {
   const [videoLoading, setVideoLoading] = useState<boolean[]>([true, true, true, true]);
   const [videoReady, setVideoReady] = useState<boolean[]>([false, false, false, false]);
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([null, null, null, null]);
+  
+  // Video start timing for security event simulation
+  const videoStartTimes = useRef<number[]>([0, 0, 0, 0]);
+  const eventSimulationDone = useRef<boolean[]>([false, false, false, false]);
+  const videoSessionStarted = useRef<boolean[]>([false, false, false, false]);
 
   // Add ref to track if subscription is already set up
   const subscriptionSetupRef = useRef(false);
@@ -147,6 +152,112 @@ export default function AccountPage() {
     });
   };
 
+  // Function to create security events with specific parameters
+  const createSecurityEvent = (cameraId: string, detected: string, severity: "low" | "medium" | "high", confidence: number, showToast: boolean = true) => {
+    const event: SecurityEvent = {
+      id: `evt_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`,
+      camera: cameraId,
+      detected,
+      timestamp: new Date().toLocaleString(),
+      status: "live",
+      combined_score: confidence,
+      scores: {
+        video: confidence + (Math.random() - 0.5) * 10,
+        audio: confidence + (Math.random() - 0.5) * 10,
+      },
+      detections: [{
+        type: detected.toLowerCase().replace(' detected', ''),
+        confidence: confidence,
+        bbox: [100, 100, 200, 150],
+        timestamp: new Date().toISOString(),
+      }],
+      severity,
+    };
+
+    // Add to live events
+    setLiveEvents((prev) => [event, ...prev]);
+
+    // Show appropriate UI based on severity (only if showToast is true)
+    if (showToast) {
+      if (severity === "high") {
+        setHighSeverityEvent(event);
+        setShowHighSeverityPopup(true);
+        toast({
+          title: "🚨 HIGH SEVERITY ALERT",
+          description: `${detected} on ${cameraId} - Immediate action required!`,
+          variant: "destructive",
+        });
+      } else {
+        const severityColor = severity === "medium" ? "orange" : "blue";
+        toast({
+          title: `Security Alert (${severity.toUpperCase()})`,
+          description: `${detected} • ${cameraId}`,
+          variant: "default",
+        });
+      }
+    } else {
+      // Still show popup for high severity even without toast
+      if (severity === "high") {
+        setHighSeverityEvent(event);
+        setShowHighSeverityPopup(true);
+      }
+    }
+  };
+
+  // Function to handle video start timing and create security events
+  const handleVideoStart = (index: number) => {
+    const currentTime = Date.now();
+    
+    // Only trigger events on the first play of a video session
+    if (!videoSessionStarted.current[index]) {
+      videoStartTimes.current[index] = currentTime;
+      videoSessionStarted.current[index] = true;
+      eventSimulationDone.current[index] = false;
+      
+      console.log(`Camera ${index + 1} session started at:`, new Date(currentTime).toLocaleTimeString());
+      
+      // Schedule security events based on camera
+      if (index === 0) { // Camera 1
+        // Medium difficulty event after 3.5 seconds
+        setTimeout(() => {
+          if (!eventSimulationDone.current[0]) {
+            createSecurityEvent("Camera 1", "Weapon Detected", "medium", 78, false);
+            eventSimulationDone.current[0] = true;
+            console.log("Created medium security event for Camera 1");
+          }
+        }, 3500);
+      } else if (index === 1) { // Camera 2
+        // High alert after 47 seconds
+        setTimeout(() => {
+          if (!eventSimulationDone.current[1]) {
+            createSecurityEvent("Camera 2", "Weapon detected", "high", 96, false);
+            eventSimulationDone.current[1] = true;
+            console.log("Created high security event for Camera 2");
+          }
+        }, 41000);
+      }
+    } else {
+      console.log(`Camera ${index + 1} looped - no new events triggered`);
+    }
+  };
+
+  // Function to reset all videos to start from beginning
+  const resetAllVideos = () => {
+    videoRefs.current.forEach((videoRef, index) => {
+      if (videoRef) {
+        videoRef.currentTime = 0;
+        videoRef.play();
+        console.log(`Reset Camera ${index + 1} to start`);
+      }
+    });
+    
+    // Reset timing, simulation flags, and session tracking
+    videoStartTimes.current = [0, 0, 0, 0];
+    eventSimulationDone.current = [false, false, false, false];
+    videoSessionStarted.current = [false, false, false, false];
+    console.log("Reset all video timing, simulation flags, and session tracking");
+  };
+
   // When both minimum delay and video loaded, hide animation and show video
   useEffect(() => {
     // Set different loading times for each video
@@ -166,6 +277,18 @@ export default function AccountPage() {
       }
     });
   }, [videoReady]);
+
+  // Reset all videos when switching to feed tab
+  useEffect(() => {
+    if (subTab === "feed") {
+      // Small delay to ensure videos are loaded before resetting
+      const timer = setTimeout(() => {
+        resetAllVideos();
+      }, 100);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [subTab]);
 
 
   const startCamera = async () => {
@@ -1124,6 +1247,7 @@ const policePayload = {
                             autoPlay
                             onLoadedData={() => handleVideoLoaded(i)}
                             onError={() => handleVideoLoaded(i)}
+                            onPlay={() => handleVideoStart(i)}
                             initial={false}
                             animate={{
                               opacity: videoLoading[i] ? 0 : 1,
@@ -1302,9 +1426,9 @@ const policePayload = {
                         </div>
                       ) : (
                         liveEvents.map((ev) => {
-                          const severityColor = ev.severity === "high" ? "red" : ev.severity === "medium" ? "orange" : "blue";
-                          const severityBg = ev.severity === "high" ? "red-500/10" : ev.severity === "medium" ? "orange-500/10" : "blue-500/10";
-                          const severityBorder = ev.severity === "high" ? "red-500/30" : ev.severity === "medium" ? "orange-500/30" : "blue-500/30";
+                          const isHigh = ev.severity === "high";
+                          const isMedium = ev.severity === "medium";
+                          const isLow = ev.severity === "low";
                           
                           return (
                             <motion.div
@@ -1312,15 +1436,23 @@ const policePayload = {
                               initial={{ opacity: 0, y: 20 }}
                               animate={{ opacity: 1, y: 0 }}
                               exit={{ opacity: 0, y: -20 }}
-                              className={`group relative rounded-xl border border-white/10 bg-zinc-800/40 p-4 backdrop-blur hover:border-${severityColor}-500/30 transition-colors`}
+                              className={`group relative rounded-xl border border-white/10 bg-zinc-800/40 p-4 backdrop-blur transition-all duration-200 hover:bg-zinc-700/50 ${
+                                isHigh ? 'hover:border-red-500/30' : 
+                                isMedium ? 'hover:border-yellow-500/30' : 
+                                'hover:border-blue-500/30'
+                              }`}
                             >
-                              <div className={`absolute inset-0 bg-gradient-to-br from-${severityColor}-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-xl`} />
-                              <div className="flex items-start justify-between gap-3 mb-4">
+                              {/* Removed hover overlay that was causing text to disappear */}
+                              <div className="flex items-start justify-between gap-3 mb-4 relative z-10">
                                 <div className="flex-1">
                                   <div className="flex items-center gap-2 mb-1">
                                     <div className="font-medium text-white">{ev.detected}</div>
                                     {ev.severity && (
-                                      <span className={`text-xs px-2 py-1 rounded-full font-medium bg-${severityBg} text-${severityColor}-300 border border-${severityBorder}`}>
+                                      <span className={`text-xs px-2 py-1 rounded-full font-medium border ${
+                                        isHigh ? 'bg-red-500/10 text-red-400 border-red-500/30' :
+                                        isMedium ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30' :
+                                        'bg-blue-500/10 text-blue-400 border-blue-500/30'
+                                      }`}>
                                         {ev.severity.toUpperCase()}
                                       </span>
                                     )}
@@ -1338,7 +1470,11 @@ const policePayload = {
                                     </div>
                                   )}
                                 </div>
-                                <div className={`w-2 h-2 bg-${severityColor}-400 rounded-full animate-pulse`} />
+                                <div className={`w-2 h-2 rounded-full animate-pulse ${
+                                  isHigh ? 'bg-red-400' :
+                                  isMedium ? 'bg-yellow-400' :
+                                  'bg-blue-400'
+                                }`} />
                               </div>
                               <div className="grid grid-cols-2 gap-3 relative z-10">
                                 <Button 
@@ -1552,13 +1688,31 @@ const policePayload = {
 
                 {/* Live Feed Simulation */}
                 <div className="bg-zinc-900/40 rounded-2xl p-6 border border-red-500/20">
-                  <h3 className="text-xl font-semibold text-white mb-4">Live Camera Feed</h3>
-                  <div className="relative bg-black rounded-xl h-64 flex items-center justify-center">
-                    <div className="text-center">
-                      <Camera className="w-16 h-16 text-red-400 mx-auto mb-4 animate-pulse" />
-                      <p className="text-red-300 font-medium">Live Feed from {highSeverityEvent.camera}</p>
-                      <p className="text-zinc-500 text-sm mt-2">Weapon detection in progress...</p>
-                    </div>
+                  <h3 className="text-xl font-semibold text-white mb-4">Recorded Camera Feed</h3>
+                  <div className="relative bg-black rounded-xl h-64 overflow-hidden">
+                    {highSeverityEvent.camera === "Camera 2" ? (
+                      <video
+                        className="w-full h-full object-cover"
+                        loop
+                        muted
+                        autoPlay
+                        playsInline
+                        onLoadedData={(e) => {
+                          // Start the video at 27 seconds (0:27)
+                          e.currentTarget.currentTime = 27;
+                        }}
+                      >
+                        <source src="/videos/Camera 2.mp4" type="video/mp4" />
+                      </video>
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <div className="text-center">
+                          <Camera className="w-16 h-16 text-red-400 mx-auto mb-4 animate-pulse" />
+                          <p className="text-red-300 font-medium">Live Feed from {highSeverityEvent.camera}</p>
+                          <p className="text-zinc-500 text-sm mt-2">Weapon detection in progress...</p>
+                        </div>
+                      </div>
+                    )}
                     {/* Simulated detection overlay */}
                     <div className="absolute top-4 left-4 bg-red-600/90 text-white px-3 py-1 rounded-full text-sm font-medium animate-pulse">
                       WEAPON DETECTED

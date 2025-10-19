@@ -33,7 +33,7 @@ export default function GalaxyHeader() {
           transition={{ type: "spring", stiffness: 100, damping: 18 }}
           className="text-6xl md:text-8xl font-bold tracking-tight text-blue-200"
         >
-          Aegis
+          Vigilant
         </motion.h1>
         
         <motion.div
