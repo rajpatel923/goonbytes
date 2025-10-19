@@ -99,7 +99,7 @@ export function Footer() {
         
         <div className="mt-12 pt-8 border-t border-border/30 flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="text-sm text-muted-foreground">
-            &copy; {currentYear} NeuroCrop. All rights reserved.
+            &copy; {currentYear} Vigilant. All rights reserved.
           </p>
           <div className="flex space-x-6">
             <a href="#" className="text-muted-foreground hover:text-foreground">

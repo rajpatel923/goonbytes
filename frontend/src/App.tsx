@@ -9,7 +9,6 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import About from "./pages/About";
 import AccountPage from "./pages/AccountPage";
 import Index from "./pages/Index";
-import MapTool from "./pages/MapTool";
 import NotFound from "./pages/NotFound";
 import Solutions from "./pages/Solutions";
 
@@ -27,22 +26,6 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/about" element={<About />} />
             <Route path="/solutions" element={<Solutions />} />
-            <Route
-              path="/map-tool"
-              element={
-                <MapTool
-                  navBar={true}
-                  initLng={0}
-                  initLat={0}
-                  markerInitPos={null}
-                  initZoom={1}
-                  setInitLng={() => {}}
-                  setInitLat={() => {}}
-                  setInitMarkPos={() => {}}
-                  setInitZoom={() => {}}
-                />
-              }
-            />
             <Route path="/account" element={
               <ErrorBoundary>
                 <AccountPage />

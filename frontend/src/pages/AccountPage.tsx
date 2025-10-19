@@ -295,7 +295,7 @@ export default function AccountPage() {
           .from("events")
           .select("*")
           .order("event_start", { ascending: false })
-          .limit(INITIAL_LOAD_LIMIT);
+          .limit(INITIAL_LOAD_LIMIT * 2); // Load more to separate live and past
 
         if (error) {
           console.error("[AccountPage] Error fetching initial events:", error);
@@ -310,8 +310,13 @@ export default function AccountPage() {
         const mapped = rows.map((row) => mapRowToSecurityEvent(row)).filter(Boolean) as SecurityEvent[];
 
         if (active) {
-          setLiveEvents(mapped);
-          console.log('[AccountPage] Initial events set in state');
+          // Separate events by status
+          const liveEvents = mapped.filter(event => event.status === 'live' || !event.status);
+          const pastEvents = mapped.filter(event => event.status === 'accepted' || event.status === 'rejected');
+          
+          setLiveEvents(liveEvents);
+          setPastEvents(pastEvents);
+          console.log('[AccountPage] Initial events set in state - Live:', liveEvents.length, 'Past:', pastEvents.length);
         }
       } catch (err) {
         console.error("[AccountPage] Failed to load initial events:", err);
@@ -356,17 +361,70 @@ export default function AccountPage() {
       }
     };
 
-    // Create a channel subscription for INSERT on public.events
+    // Listener callback: handle status updates
+    const handleUpdate = (payload: any) => {
+      if (!active) return;
+      
+      try {
+        console.log('[AccountPage] Received update event:', payload);
+        const row = payload?.new || payload;
+        if (!row) {
+          console.warn('[AccountPage] Update payload missing row data');
+          return;
+        }
+
+        const incomingId = row.id || row.event_id;
+        if (!incomingId) {
+          console.warn('[AccountPage] Update row missing id');
+          return;
+        }
+        
+        const secEvent = mapRowToSecurityEvent(row);
+        if (!secEvent) {
+          console.warn('[AccountPage] Failed to map updated event, skipping');
+          return;
+        }
+
+        console.log('[AccountPage] Event status updated:', secEvent.status, 'for event:', incomingId);
+
+        // Move event from live to past if status changed to accepted/rejected
+        if (secEvent.status === 'accepted' || secEvent.status === 'rejected') {
+          setLiveEvents((prev) => prev.filter((e) => e.id !== incomingId));
+          setPastEvents((prev) => {
+            // Remove if already exists, then add updated version
+            const filtered = prev.filter((e) => e.id !== incomingId);
+            return [secEvent, ...filtered];
+          });
+        } else if (secEvent.status === 'live' || !secEvent.status) {
+          // Move event from past back to live if status changed to live
+          setPastEvents((prev) => prev.filter((e) => e.id !== incomingId));
+          setLiveEvents((prev) => {
+            // Remove if already exists, then add updated version
+            const filtered = prev.filter((e) => e.id !== incomingId);
+            return [secEvent, ...filtered];
+          });
+        }
+      } catch (err) {
+        console.error("[AccountPage] Error handling supabase update payload:", err);
+      }
+    };
+
+    // Create a channel subscription for INSERT and UPDATE on public.events
     let channel: any = null;
     
     try {
       console.log('[AccountPage] Setting up realtime subscription...');
       channel = supabase
-        .channel("public:events:inserts")
+        .channel("public:events:changes")
         .on(
           "postgres_changes",
           { event: "INSERT", schema: "public", table: "events" },
           handleInsert
+        )
+        .on(
+          "postgres_changes",
+          { event: "UPDATE", schema: "public", table: "events" },
+          handleUpdate
         )
         .subscribe((status) => {
           console.log('[AccountPage] Subscription status:', status);
@@ -492,20 +550,93 @@ export default function AccountPage() {
     });
   };
 
-  const approveEvent = (id: string) => {
+  const approveEvent = async (id: string) => {
     const ev = liveEvents.find((e) => e.id === id);
     if (!ev) return;
+    
+    console.log("Approving event:", ev);
     toast({ title: "Calling principal…" });
     setTimeout(() => toast({ title: "Calling police station…" }), 500);
-    setLiveEvents((prev) => prev.filter((e) => e.id !== id));
-    setPastEvents((prev) => [{ ...ev, status: "accepted" }, ...prev]);
+    
+    try {
+      // Update the event status in Supabase
+      const { error } = await supabase
+        .from('events')
+        .update({ status: 'accepted' })
+        .eq('id', id);
+      
+      if (error) {
+        console.error('Error updating event status:', error);
+        toast({ 
+          title: "Error updating event", 
+          description: "Failed to update event status in database",
+          variant: "destructive" 
+        });
+        return;
+      }
+      
+      console.log('Event status updated to accepted in Supabase');
+      
+      // Update local state
+      setLiveEvents((prev) => prev.filter((e) => e.id !== id));
+      setPastEvents((prev) => [{ ...ev, status: "accepted" }, ...prev]);
+      
+      toast({ 
+        title: "Event approved", 
+        description: `${ev.detected} has been escalated` 
+      });
+    } catch (err) {
+      console.error('Error in approveEvent:', err);
+      toast({ 
+        title: "Error", 
+        description: "Failed to approve event",
+        variant: "destructive" 
+      });
+    }
   };
 
-  const rejectEvent = (id: string) => {
+  const rejectEvent = async (id: string) => {
+    console.log("Reject button clicked for event:", id);
     const ev = liveEvents.find((e) => e.id === id);
-    if (!ev) return;
-    setLiveEvents((prev) => prev.filter((e) => e.id !== id));
-    setPastEvents((prev) => [{ ...ev, status: "rejected" }, ...prev]);
+    if (!ev) {
+      console.log("Event not found:", id);
+      return;
+    }
+    
+    console.log("Rejecting event:", ev);
+    
+    try {
+      // Update the event status in Supabase
+      const { error } = await supabase
+        .from('events')
+        .update({ status: 'rejected' })
+        .eq('id', id);
+      
+      if (error) {
+        console.error('Error updating event status:', error);
+        toast({ 
+          title: "Error updating event", 
+          description: "Failed to update event status in database",
+          variant: "destructive" 
+        });
+        return;
+      }
+      
+      console.log('Event status updated to rejected in Supabase');
+      
+      // Update local state
+      setLiveEvents((prev) => prev.filter((e) => e.id !== id));
+      setPastEvents((prev) => [{ ...ev, status: "rejected" }, ...prev]);
+      
+      toast({ title: "Event rejected", description: `${ev.detected} has been dismissed` });
+    } catch (err) {
+      console.error('Error in rejectEvent:', err);
+      toast({ 
+        title: "Error", 
+        description: "Failed to reject event",
+        variant: "destructive" 
+      });
+    }
   };
 
   if (loading || !user) {
@@ -824,18 +955,23 @@ export default function AccountPage() {
                                 </div>
                                 <div className={`w-2 h-2 bg-${severityColor}-400 rounded-full animate-pulse`} />
                               </div>
-                              <div className="grid grid-cols-2 gap-3">
+                              <div className="grid grid-cols-2 gap-3 relative z-10">
                                 <Button 
                                   variant="outline" 
-                                  onClick={() => rejectEvent(ev.id)} 
-                                  className="rounded-lg bg-red-500/10 hover:bg-red-500/20 border-red-500/30 text-red-300 hover:text-red-200 transition-all"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    console.log("Reject button clicked!");
+                                    rejectEvent(ev.id);
+                                  }} 
+                                  className="rounded-lg bg-red-500/10 hover:bg-red-500/20 border-red-500/30 text-red-300 hover:text-red-200 transition-all relative z-20 pointer-events-auto"
                                 >
                                   <X className="w-4 h-4 mr-2" /> 
                                   Reject
                                 </Button>
                                 <Button 
                                   onClick={() => approveEvent(ev.id)} 
-                                  className="rounded-lg bg-blue-500/20 hover:bg-blue-500/30 border-blue-500/30 text-blue-300 hover:text-blue-200 transition-all"
+                                  className="rounded-lg bg-blue-500/20 hover:bg-blue-500/30 border-blue-500/30 text-blue-300 hover:text-blue-200 transition-all relative z-20 pointer-events-auto"
                                 >
                                   <Check className="w-4 h-4 mr-2" /> 
                                   Approve
@@ -1014,8 +1150,11 @@ export default function AccountPage() {
                     <Button
                       size="lg"
                       variant="outline"
-                      className="w-full border-red-500/30 text-red-300 hover:bg-red-500/10 py-4 text-lg rounded-xl"
-                      onClick={() => {
+                      className="w-full border-red-500/30 text-red-300 hover:bg-red-500/10 py-4 text-lg rounded-xl relative z-20 pointer-events-auto"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        console.log("High severity reject button clicked!");
                         rejectEvent(highSeverityEvent.id);
                         setShowHighSeverityPopup(false);
                       }}

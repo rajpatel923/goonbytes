@@ -33,7 +33,7 @@ export default function About() {
             <h1 className="text-4xl md:text-5xl font-bold text-blue-200 tracking-tight mb-6">
               Safer Schools with <span className="text-blue-500">AI Vision</span> and Audio Detection
             </h1>
-            <p className="text-xl text-muted-foreground text-blue-100">
+            <p className="text-xl text-blue-100">
               We integrate AI-powered vision and audio detection into existing security cameras to identify threats
               like weapons, aggressive actions, and gunshots in real time—helping staff respond faster and keep
               students and educators safe.
@@ -53,7 +53,7 @@ export default function About() {
             viewport={{ once: true }}
           >
             <h2 className="text-3xl font-bold tracking-tight mb-4 text-blue-200">Who We Are</h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto text-blue-100">
+            <p className="text-lg max-w-2xl mx-auto text-blue-100">
               We are computer vision engineers, ML researchers, and campus safety advocates building privacy-first
               detection that runs at the edge, minimizes false alarms, and alerts the right people in seconds.
             </p>
