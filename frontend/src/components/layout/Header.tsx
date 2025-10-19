@@ -48,7 +48,7 @@ export function Header() {
               <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10 text-primary">
                 <Leaf className="w-6 h-6 animate-pulse-gentle" />
               </div>
-              <span className="text-xl font-bold tracking-tight">NeuroCrop</span>
+              <span className="text-xl font-bold tracking-tight">Vigilant</span>
             </Link>
             <nav className="hidden md:flex space-x-1">
               {navigation.map((item) => {
@@ -140,7 +140,7 @@ export function Header() {
             <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10 text-primary">
               <Leaf className="w-6 h-6" />
             </div>
-            <span className="text-xl font-bold tracking-tight">NeuroCrop</span>
+            <span className="text-xl font-bold tracking-tight">Vigilant</span>
           </Link>
           <button
             type="button"

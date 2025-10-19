@@ -38,7 +38,7 @@ export function LoginForm({ onToggleForm, onSuccess }: { onToggleForm: () => voi
     <div className="space-y-6 animate-scale-in">
       <div className="space-y-2 text-center">
         <h1 className="text-3xl font-bold tracking-tighter">Welcome back</h1>
-        <p className="text-muted-foreground">Sign in to your NeuroCrop account</p>
+        <p className="text-muted-foreground">Sign in to your Vigilant account</p>
       </div>
       
       <form onSubmit={handleSubmit} className="space-y-4">

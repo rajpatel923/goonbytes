@@ -93,7 +93,7 @@ export default function Solutions() {
             transition={{ duration: 0.8 }}
           >
             <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-6">
-              NeuroCrop <span className="text-primary">Solutions</span>
+              Vigilant <span className="text-primary">Solutions</span>
             </h1>
             <p className="text-xl text-muted-foreground">
               Our AI-powered platform provides innovative solutions to the most pressing challenges in modern agriculture.

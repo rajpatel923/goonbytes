@@ -44,7 +44,7 @@ export function SignupForm({ onToggleForm, onSuccess }: { onToggleForm: () => vo
     <div className="space-y-6 animate-scale-in">
       <div className="space-y-2 text-center">
         <h1 className="text-3xl font-bold tracking-tighter">Create your account</h1>
-        <p className="text-muted-foreground">Sign up to start using NeuroCrop</p>
+        <p className="text-muted-foreground">Sign up to start using Vigilant</p>
       </div>
       
       <form onSubmit={handleSubmit} className="space-y-4">
