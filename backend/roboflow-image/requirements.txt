@@ -1,5 +1,12 @@
-inference==0.58.2
+# Essential dependencies for gun detection
+inference[transformers]==0.58.2
 opencv-python==4.10.0.84
 python-dotenv==1.0.1
 supervision>=0.26.0
 httpx>=1.3.0
+
+# FastAPI WebSocket streaming dependencies
+fastapi==0.115.0
+uvicorn[standard]==0.32.0
+websockets==13.1
+python-multipart==0.0.12

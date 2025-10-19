@@ -55,9 +55,17 @@ export default function AccountPage() {
   };
   const [liveEvents, setLiveEvents] = useState<SecurityEvent[]>([]);
   const [pastEvents, setPastEvents] = useState<SecurityEvent[]>([]);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const videoRef = useRef<HTMLImageElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [camStarting, setCamStarting] = useState(false);
+  
+  // WebSocket streaming state
+  const wsRef = useRef<WebSocket | null>(null);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [wsConnected, setWsConnected] = useState(false);
+  const reconnectAttempts = useRef(0);
+  const maxReconnectAttempts = 3;
+  const manualStopRef = useRef(false); // Flag to prevent auto-reconnection on manual stop
   const [eventsTab, setEventsTab] = useState<"live" | "past">("live");
   const [highSeverityEvent, setHighSeverityEvent] = useState<SecurityEvent | null>(null);
   const [showHighSeverityPopup, setShowHighSeverityPopup] = useState(false);
@@ -107,31 +115,23 @@ export default function AccountPage() {
 
 
   const startCamera = async () => {
-    if (camStarting || streamRef.current) return;
+    if (camStarting || isStreaming) return;
     setCamStarting(true);
+    
+    // Reset manual stop flag when starting
+    manualStopRef.current = false;
+    
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { 
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        }, 
-        audio: false 
-      });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.onloadedmetadata = () => {
-          videoRef.current?.play().catch(() => {
-            console.log("Autoplay prevented, user interaction required");
-          });
-        };
+      // Connect to WebSocket for AI detection stream
+      const connected = await connectWebSocket();
+      if (!connected) {
+        throw new Error("Failed to connect to detection server");
       }
-      toast({ title: "Camera started", description: "Live feed is now active" });
     } catch (err: any) {
-      console.error("Camera error:", err);
+      console.error("WebSocket connection error:", err);
       toast({ 
-        title: "Camera error", 
-        description: err?.message || "Unable to access camera. Please check permissions.",
+        title: "Connection error", 
+        description: err?.message || "Unable to connect to detection server. Make sure the Python server is running.",
         variant: "destructive"
       });
     } finally {
@@ -140,28 +140,156 @@ export default function AccountPage() {
   };
 
   const stopCamera = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => {
-        track.stop();
-        console.log("Stopped track:", track.kind);
-      });
-      streamRef.current = null;
-    }
+    // Disconnect WebSocket
+    disconnectWebSocket();
+    
+    // Clear img element
     if (videoRef.current) {
-      videoRef.current.srcObject = null;
-      videoRef.current.pause();
+      if (videoRef.current.dataset.previousUrl) {
+        URL.revokeObjectURL(videoRef.current.dataset.previousUrl);
+      }
+      videoRef.current.src = '';
     }
-    toast({ title: "Camera stopped", description: "Live feed has been disabled" });
+    
+    toast({ title: "Camera stopped", description: "AI detection stream has been disabled" });
+  };
+
+  // WebSocket connection functions
+  const connectWebSocket = () => {
+    return new Promise<boolean>((resolve) => {
+      try {
+        const ws = new WebSocket('ws://localhost:8000/ws/video-stream');
+        
+        ws.onopen = () => {
+          console.log('WebSocket connected');
+          setWsConnected(true);
+          setIsStreaming(true);
+          wsRef.current = ws;
+          reconnectAttempts.current = 0;
+          toast({ title: "Connected to AI detection", description: "Gun detection stream started" });
+          resolve(true);
+        };
+
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            
+            if (data.type === 'frame' && data.data) {
+              // Update img element src directly with base64 data URL
+              if (videoRef.current) {
+                // Clean up previous URL to prevent memory leaks
+                if (videoRef.current.dataset.previousUrl) {
+                  URL.revokeObjectURL(videoRef.current.dataset.previousUrl);
+                }
+                
+                // Create data URL directly from base64
+                const dataUrl = `data:image/jpeg;base64,${data.data}`;
+                videoRef.current.src = dataUrl;
+                videoRef.current.dataset.previousUrl = dataUrl;
+              }
+            } else if (data.type === 'error') {
+              console.error('WebSocket error:', data.message);
+              toast({ 
+                title: "Stream Error", 
+                description: data.message,
+                variant: "destructive"
+              });
+            } else if (data.type === 'status') {
+              console.log('WebSocket status:', data.message);
+              toast({ 
+                title: "Stream Status", 
+                description: data.message,
+                variant: "default"
+              });
+            }
+          } catch (error) {
+            console.error('Error parsing WebSocket message:', error);
+          }
+        };
+
+        ws.onclose = () => {
+          console.log('WebSocket disconnected');
+          setWsConnected(false);
+          setIsStreaming(false);
+          wsRef.current = null;
+          
+          // Only attempt reconnection if NOT manually stopped
+          if (!manualStopRef.current && reconnectAttempts.current < maxReconnectAttempts) {
+            reconnectAttempts.current++;
+            console.log(`Attempting reconnection ${reconnectAttempts.current}/${maxReconnectAttempts}`);
+            setTimeout(() => {
+              if (!wsRef.current && !manualStopRef.current) {
+                connectWebSocket().then(resolve);
+              }
+            }, 2000);
+          } else if (manualStopRef.current) {
+            console.log('Manual stop detected - no reconnection');
+            resolve(false);
+          } else {
+            toast({ 
+              title: "Connection Lost", 
+              description: "Failed to reconnect to detection server",
+              variant: "destructive"
+            });
+            resolve(false);
+          }
+        };
+
+        ws.onerror = (error) => {
+          console.error('WebSocket error:', error);
+          setWsConnected(false);
+          setIsStreaming(false);
+          toast({ 
+            title: "Connection Error", 
+            description: "Failed to connect to detection server",
+            variant: "destructive"
+          });
+          resolve(false);
+        };
+
+      } catch (error) {
+        console.error('Error creating WebSocket:', error);
+        toast({ 
+          title: "Connection Error", 
+          description: "Failed to create WebSocket connection",
+          variant: "destructive"
+        });
+        resolve(false);
+      }
+    });
+  };
+
+  const disconnectWebSocket = () => {
+    // Set manual stop flag to prevent reconnection
+    manualStopRef.current = true;
+    
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+    setWsConnected(false);
+    setIsStreaming(false);
+    reconnectAttempts.current = 0;
   };
 
   useEffect(() => {
     if (subTab === "live") {
       startCamera();
     } else {
-      stopCamera();
+      // Only stop camera if it's actually running
+      if (isStreaming) {
+        stopCamera();
+      }
     }
     return () => {
-      stopCamera();
+      // Cleanup on unmount or tab change
+      disconnectWebSocket();
+      if (videoRef.current) {
+        if (videoRef.current.dataset.previousUrl) {
+          URL.revokeObjectURL(videoRef.current.dataset.previousUrl);
+        }
+        videoRef.current.src = '';
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subTab]);
@@ -804,36 +932,41 @@ export default function AccountPage() {
                   <h2 className="text-2xl font-semibold mb-6 text-white">Live Camera</h2>
                   <Card className="group relative rounded-2xl border border-white/10 bg-zinc-900/40 backdrop-blur hover:border-blue-500/30 transition-colors overflow-hidden min-h-[18rem] lg:min-h-[24rem]">
                     <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl" />
-                    <video
+                    <img
                       ref={videoRef}
                       className="w-full h-full object-contain bg-black rounded-2xl"
-                      autoPlay
-                      muted
-                      playsInline
+                      alt="AI Detection Stream"
                     />
                     <div className="absolute top-4 right-4 flex gap-2">
                       <Button 
                         size="sm" 
                         className="rounded-xl bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 text-blue-300 hover:text-blue-200 transition-all" 
                         onClick={startCamera} 
-                        disabled={camStarting || !!streamRef.current}
+                        disabled={camStarting || isStreaming}
                       >
                         {camStarting ? (
                           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                         ) : (
                           <Camera className="w-4 h-4 mr-2" />
                         )}
-                        {camStarting ? "Starting..." : "Start"}
+                        {camStarting ? "Connecting..." : isStreaming ? "Connected" : "Start AI Detection"}
                       </Button>
                       <Button 
                         size="sm" 
                         className="rounded-xl bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-300 hover:text-red-200 transition-all" 
                         onClick={stopCamera} 
-                        disabled={!streamRef.current}
+                        disabled={!isStreaming}
                       >
                         <X className="w-4 h-4 mr-2" />
                         Stop
                       </Button>
+                    </div>
+                    {/* Connection Status Indicator */}
+                    <div className="absolute top-4 left-4 flex items-center gap-2">
+                      <div className={`w-2 h-2 rounded-full ${wsConnected ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`} />
+                      <span className="text-xs text-zinc-300">
+                        {wsConnected ? 'AI Detection Active' : 'Disconnected'}
+                      </span>
                     </div>
                   </Card>
                 </div>
