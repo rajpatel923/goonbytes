@@ -3,6 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/context/AuthContext";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import About from "./pages/About";
@@ -42,7 +43,11 @@ const App = () => (
                 />
               }
             />
-            <Route path="/account" element={<AccountPage />} />
+            <Route path="/account" element={
+              <ErrorBoundary>
+                <AccountPage />
+              </ErrorBoundary>
+            } />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

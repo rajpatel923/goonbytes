@@ -22,21 +22,48 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    console.log('[AuthContext] Initializing auth...');
+    
+    // Guard against missing Supabase configuration
+    if (!supabase) {
+      console.error('[AuthContext] Supabase client not available');
+      setLoading(false);
+      return;
+    }
+
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-      setUser(session?.user ?? null)
-      setLoading(false)
-    })
+    supabase.auth.getSession()
+      .then(({ data: { session }, error }) => {
+        if (error) {
+          console.error('[AuthContext] Error getting session:', error);
+        }
+        console.log('[AuthContext] Initial session:', session ? 'logged in' : 'logged out');
+        setSession(session)
+        setUser(session?.user ?? null)
+        setLoading(false)
+      })
+      .catch((err) => {
+        console.error('[AuthContext] Failed to get session:', err);
+        setLoading(false);
+      });
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session)
-      setUser(session?.user ?? null)
-      setLoading(false)
-    })
+    try {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        console.log('[AuthContext] Auth state changed:', _event);
+        setSession(session)
+        setUser(session?.user ?? null)
+        setLoading(false)
+      })
 
-    return () => subscription.unsubscribe()
+      return () => {
+        console.log('[AuthContext] Cleaning up auth subscription');
+        subscription.unsubscribe();
+      }
+    } catch (err) {
+      console.error('[AuthContext] Error setting up auth listener:', err);
+      setLoading(false);
+    }
   }, [])
 
   const signIn = async (email: string, password: string) => {

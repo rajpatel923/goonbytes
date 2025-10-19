@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/lib/supabase";
 
 // Security Dashboard page: left sub-nav (Feed, Live Camera, Emergency SOS),
 // center content (6 feed placeholders or live view or SOS), right Events with Live/Past.
@@ -61,6 +62,9 @@ export default function AccountPage() {
   const [highSeverityEvent, setHighSeverityEvent] = useState<SecurityEvent | null>(null);
   const [showHighSeverityPopup, setShowHighSeverityPopup] = useState(false);
   const [expandedCamera, setExpandedCamera] = useState<number | null>(null);
+
+  // Add ref to track if subscription is already set up
+  const subscriptionSetupRef = useRef(false);
 
   // Animation refs and variants
   const headerRef = useRef(null);
@@ -216,6 +220,187 @@ export default function AccountPage() {
       });
     }
   };
+
+  // Subscribe to Supabase `events` table INSERTs and add them to liveEvents
+  useEffect(() => {
+    // Prevent double subscription in React StrictMode
+    if (subscriptionSetupRef.current) {
+      console.log('[AccountPage] Subscription already set up, skipping...');
+      return;
+    }
+    
+    console.log('[AccountPage] Supabase subscription effect starting...');
+    subscriptionSetupRef.current = true;
+    
+    // Simple flag to prevent state updates after unmount
+    let active = true;
+    
+    const INITIAL_LOAD_LIMIT = 5;
+
+    // Helper: map a DB row to SecurityEvent and normalize numeric units (convert 0..1 to 0..100%)
+    const mapRowToSecurityEvent = (row: any): SecurityEvent | null => {
+      try {
+        const rawPayload = row.payload ?? row;
+
+        // Determine combined_score: prefer top-level column, fall back to payload
+        const rawCombined = row.combined_score ?? rawPayload.combined_score;
+        const combinedScorePct = rawCombined != null ? Number(rawCombined) * (rawCombined > 1 ? 1 : 100) : undefined;
+
+        // Scores may be top-level or inside payload
+        const rawScores = row.scores ?? rawPayload.scores;
+        let scoresPct: SecurityEvent['scores'] | undefined = undefined;
+        if (rawScores) {
+          const v = rawScores.video != null ? Number(rawScores.video) : undefined;
+          const a = rawScores.audio != null ? Number(rawScores.audio) : undefined;
+          scoresPct = {
+            video: v != null ? v * (v > 1 ? 1 : 100) : undefined,
+            audio: a != null ? a * (a > 1 ? 1 : 100) : undefined,
+          } as SecurityEvent['scores'];
+        }
+
+        const detections = rawPayload?.detections ?? [];
+
+        const detected = (detections && detections.length > 0)
+          ? (detections[0].type || detections[0].label || detections[0].label_name || 'Security threat detected')
+          : (rawPayload?.description || 'Security threat detected');
+
+        const sec: SecurityEvent = {
+          id: row.id || row.event_id,
+          camera: row.camera_id ? `Camera ${row.camera_id}` : row.camera || 'Unknown Camera',
+          detected,
+          timestamp: row.event_start ? new Date(row.event_start).toLocaleString() : new Date().toLocaleString(),
+          status: row.status || 'live',
+          event_id: row.event_id || row.id,
+          camera_id: row.camera_id,
+          event_start: row.event_start,
+          event_end: row.event_end,
+          combined_score: combinedScorePct,
+          scores: scoresPct,
+          detections,
+          severity: row.severity || rawPayload?.severity,
+        };
+
+        return sec;
+      } catch (err) {
+        console.error('[AccountPage] Error in mapRowToSecurityEvent:', err, 'row:', row);
+        return null; // Return null instead of a fallback to avoid bad data
+      }
+    };
+
+    // Fetch the latest N events from the DB on mount
+    const loadInitialEvents = async () => {
+      try {
+        console.log('[AccountPage] Loading initial events...');
+        const { data, error } = await supabase
+          .from("events")
+          .select("*")
+          .order("event_start", { ascending: false })
+          .limit(INITIAL_LOAD_LIMIT);
+
+        if (error) {
+          console.error("[AccountPage] Error fetching initial events:", error);
+          return;
+        }
+
+        console.log('[AccountPage] Initial events loaded:', data?.length || 0, 'events');
+
+        if (!data || !Array.isArray(data)) return;
+
+        const rows = data as any[];
+        const mapped = rows.map((row) => mapRowToSecurityEvent(row)).filter(Boolean) as SecurityEvent[];
+
+        if (active) {
+          setLiveEvents(mapped);
+          console.log('[AccountPage] Initial events set in state');
+        }
+      } catch (err) {
+        console.error("[AccountPage] Failed to load initial events:", err);
+      }
+    };
+
+    // Listener callback: convert a DB row into SecurityEvent and prepend
+    const handleInsert = (payload: any) => {
+      if (!active) return;
+      
+      try {
+        console.log('[AccountPage] Received insert event:', payload);
+        const row = payload?.new || payload;
+        if (!row) {
+          console.warn('[AccountPage] Insert payload missing row data');
+          return;
+        }
+
+        // Avoid duplicates by id
+        const incomingId = row.id || row.event_id;
+        if (!incomingId) {
+          console.warn('[AccountPage] Insert row missing id');
+          return;
+        }
+        
+        const secEvent = mapRowToSecurityEvent(row);
+        if (!secEvent) {
+          console.warn('[AccountPage] Failed to map event, skipping');
+          return;
+        }
+
+        setLiveEvents((prev) => {
+          if (prev.some((e) => e.id === incomingId)) {
+            console.log('[AccountPage] Duplicate event ignored:', incomingId);
+            return prev;
+          }
+          console.log('[AccountPage] New event added to liveEvents:', secEvent);
+          return [secEvent, ...prev];
+        });
+      } catch (err) {
+        console.error("[AccountPage] Error handling supabase insert payload:", err);
+      }
+    };
+
+    // Create a channel subscription for INSERT on public.events
+    let channel: any = null;
+    
+    try {
+      console.log('[AccountPage] Setting up realtime subscription...');
+      channel = supabase
+        .channel("public:events:inserts")
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "events" },
+          handleInsert
+        )
+        .subscribe((status) => {
+          console.log('[AccountPage] Subscription status:', status);
+        });
+
+      // Load initial events after setting up subscription
+      loadInitialEvents();
+
+    } catch (err) {
+      console.error('[AccountPage] Error setting up subscription:', err);
+      subscriptionSetupRef.current = false;
+    }
+
+    // Cleanup function
+    return () => {
+      console.log('[AccountPage] Cleaning up subscription...');
+      active = false;
+      subscriptionSetupRef.current = false;
+      
+      if (channel) {
+        try {
+          supabase.removeChannel(channel);
+          console.log('[AccountPage] Channel removed');
+        } catch (err) {
+          console.error('[AccountPage] Error removing channel:', err);
+          try {
+            channel.unsubscribe();
+          } catch (e) {
+            // ignore
+          }
+        }
+      }
+    };
+  }, []);
 
   // Simulate AI model event for testing
   const simulateAIModelEvent = () => {
@@ -630,7 +815,8 @@ export default function AccountPage() {
                                       Confidence: {ev.combined_score.toFixed(1)}% 
                                       {ev.scores && (
                                         <span className="ml-2">
-                                          (Video: {ev.scores.video.toFixed(1)}%, Audio: {ev.scores.audio.toFixed(1)}%)
+                                          (Video: {ev.scores.video?.toFixed(1) ?? 'N/A'}%
+                                          {ev.scores.audio != null && `, Audio: ${ev.scores.audio.toFixed(1)}%`})
                                         </span>
                                       )}
                                     </div>
@@ -780,30 +966,34 @@ export default function AccountPage() {
                     <div className="bg-zinc-900/40 rounded-2xl p-6 border border-red-500/20">
                       <h3 className="text-xl font-semibold text-white mb-4">Detection Scores</h3>
                       <div className="space-y-4">
-                        <div>
-                          <div className="flex justify-between mb-2">
-                            <span className="text-zinc-400">Video Analysis</span>
-                            <span className="text-white font-medium">{highSeverityEvent.scores.video.toFixed(1)}%</span>
+                        {highSeverityEvent.scores.video != null && (
+                          <div>
+                            <div className="flex justify-between mb-2">
+                              <span className="text-zinc-400">Video Analysis</span>
+                              <span className="text-white font-medium">{highSeverityEvent.scores.video.toFixed(1)}%</span>
+                            </div>
+                            <div className="w-full bg-zinc-700 rounded-full h-2">
+                              <div 
+                                className="bg-red-500 h-2 rounded-full transition-all duration-500"
+                                style={{ width: `${highSeverityEvent.scores.video}%` }}
+                              />
+                            </div>
                           </div>
-                          <div className="w-full bg-zinc-700 rounded-full h-2">
-                            <div 
-                              className="bg-red-500 h-2 rounded-full transition-all duration-500"
-                              style={{ width: `${highSeverityEvent.scores.video}%` }}
-                            />
+                        )}
+                        {highSeverityEvent.scores.audio != null && (
+                          <div>
+                            <div className="flex justify-between mb-2">
+                              <span className="text-zinc-400">Audio Analysis</span>
+                              <span className="text-white font-medium">{highSeverityEvent.scores.audio.toFixed(1)}%</span>
+                            </div>
+                            <div className="w-full bg-zinc-700 rounded-full h-2">
+                              <div 
+                                className="bg-red-500 h-2 rounded-full transition-all duration-500"
+                                style={{ width: `${highSeverityEvent.scores.audio}%` }}
+                              />
+                            </div>
                           </div>
-                        </div>
-                        <div>
-                          <div className="flex justify-between mb-2">
-                            <span className="text-zinc-400">Audio Analysis</span>
-                            <span className="text-white font-medium">{highSeverityEvent.scores.audio.toFixed(1)}%</span>
-                          </div>
-                          <div className="w-full bg-zinc-700 rounded-full h-2">
-                            <div 
-                              className="bg-red-500 h-2 rounded-full transition-all duration-500"
-                              style={{ width: `${highSeverityEvent.scores.audio}%` }}
-                            />
-                          </div>
-                        </div>
+                        )}
                       </div>
                     </div>
                   )}

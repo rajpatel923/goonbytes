@@ -158,6 +158,48 @@ export type Database = {
         };
         Relationships: [];
       };
+      events: {
+        Row: {
+          id: string;
+          camera_id: string | null;
+          event_start: string; /* timestamptz */
+          event_end: string | null; /* timestamptz */
+          combined_score: number | null; /* 0..1 float */
+          scores: Json | null; /* jsonb of individual model scores */
+          severity: string | null;
+          status: string | null;
+          payload: Json | null;
+          thumbnail_url: string | null;
+          created_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          camera_id?: string | null;
+          event_start?: string;
+          event_end?: string | null;
+          combined_score?: number | null;
+          scores?: Json | null;
+          severity?: string | null;
+          status?: string | null;
+          payload?: Json | null;
+          thumbnail_url?: string | null;
+          created_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          camera_id?: string | null;
+          event_start?: string;
+          event_end?: string | null;
+          combined_score?: number | null;
+          scores?: Json | null;
+          severity?: string | null;
+          status?: string | null;
+          payload?: Json | null;
+          thumbnail_url?: string | null;
+          created_at?: string | null;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;

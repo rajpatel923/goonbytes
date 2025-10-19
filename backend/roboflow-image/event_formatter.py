@@ -14,8 +14,12 @@ load_dotenv()
 # Severity thresholds (tunable)
 # If combined_score < LOW_SEVERITY_THRESHOLD, the event will be suppressed (no ping)
 LOW_SEVERITY_THRESHOLD = 0.7
-MEDIUM_SEVERITY_THRESHOLD = 0.8
-HIGH_SEVERITY_THRESHOLD = 0.9
+MEDIUM_SEVERITY_THRESHOLD = 0.775
+HIGH_SEVERITY_THRESHOLD = 0.85
+
+# Deduplication interval (seconds). If an event was pushed for the same camera
+# within this interval, skip generating/pushing another event.
+DEDUPE_SECONDS = 15
 
 
 def iso_now() -> str:
@@ -189,8 +193,24 @@ class EventAggregator:
         self.frames_required = frames_required
         # camera_id -> deque of frame summaries (dicts)
         self.buffers = defaultdict(lambda: deque(maxlen=self.frames_required))
+        # camera_id -> last event sent ISO timestamp string
+        self._last_sent = {}
 
     def add_frame(self, result: Dict[str, Any], camera_id: str = "unknown") -> Optional[Dict[str, Any]]:
+        # Quick dedupe check: if an event was sent recently for this camera, skip
+        try:
+            last_iso = self._last_sent.get(camera_id)
+            if last_iso:
+                last_ts = datetime.fromisoformat(last_iso)
+                now_ts = datetime.now(timezone.utc)
+                delta = (now_ts - last_ts).total_seconds()
+                if delta < DEDUPE_SECONDS:
+                    # Skip quickly — too soon since last event for this camera
+                    return None
+        except Exception:
+            # If any parsing error occurs, ignore dedupe and continue
+            pass
+
         summary = extract_frame_summary(result)
         summary["timestamp"] = iso_now()
         buf = self.buffers[camera_id]
@@ -255,6 +275,11 @@ class EventAggregator:
         # Attempt to push the event to Supabase (best-effort; do not raise)
         try:
             _push_event_to_supabase(event)
+            # record last-sent timestamp for deduplication
+            try:
+                self._last_sent[camera_id] = iso_now()
+            except Exception:
+                pass
         except Exception:
             # swallow exceptions — aggregator should not crash the detection loop
             pass
@@ -288,6 +313,10 @@ def _push_event_to_supabase(event: Dict[str, Any]) -> None:
         "event_start": event.get("event_start"),
         "event_end": event.get("event_end"),
         "combined_score": event.get("combined_score"),
+        # also write a top-level scores column for easier querying from the frontend
+        "scores": event.get("scores"),
+        # optional thumbnail if the pipeline produced one
+        "thumbnail_url": payload.get("thumbnail_url") if isinstance(payload, dict) else None,
         "severity": event.get("severity"),
         "payload": payload,
     }
