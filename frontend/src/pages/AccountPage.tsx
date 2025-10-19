@@ -149,7 +149,7 @@ export default function AccountPage() {
   }
 
   return (
-    <div className="min-h-screen pt-20 bg-[#1f2022] text-blue-200">
+<div className="min-h-screen pt-20 bg-[#1f2022] text-blue-200">
       <section className="py-4 lg:py-6">
         <div className="w-full max-w-none px-2 sm:px-4">
           <motion.div
@@ -157,7 +157,7 @@ export default function AccountPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4 }}
           >
-            <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center justify-between mb-4">
               <div>
                 <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Security Dashboard</h1>
                 <p className="text-blue-100/80 text-sm">Monitor feeds, events, and SOS in real-time.</p>
@@ -255,30 +255,51 @@ export default function AccountPage() {
                 )}
               </main>
 
-              <aside className="w-full">
-                <Card className="p-3 sm:p-4 bg-background/20 backdrop-blur-md border border-border/30 rounded-2xl" style={{ backgroundImage: starBackground, backgroundSize: '1000px 100px', backgroundRepeat: 'repeat-x' }}>
+<aside className="w-full">
+                <Card className="p-3 sm:p-4 bg-background/20 backdrop-blur-md border border-border/30 rounded-2xl" style={{ backgroundImage: starBackground, backgroundSize: '100px 100px', backgroundRepeat: 'repeat-x' }}>
                   <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-lg font-semibold">Events</h3>
+                    <h3 className="text-lg font-semibold text-white">Events</h3>
                   </div>
                   <Tabs value={eventsTab} onValueChange={(v) => setEventsTab(v as "live" | "past")} className="w-full">
-                    <TabsList className="relative w-full grid grid-cols-2 gap-2 bg-transparent p-0">
-                      <TabsTrigger value="live" className="relative px-3 py-2 text-sm rounded-lg transition-all duration-300 hover-scale text-white">
+                    {/* MODIFIED TabsList */}
+                    <TabsList className=" relative grid grid-cols-2 gap-2 p-1 items-center bg-transparent backdrop-blur-md border border-border/30 rounded-full shadow-lg w-auto h-full">
+                      
+                      {/* SINGLE ANIMATED HIGHLIGHTER */}
+                      <motion.div
+                        className="absolute top-1 bottom-1 bg-blue-500/20 rounded-full"
+                        layout
+                        transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                        // This uses a simple calculation for the width of the highlighter.
+                        // Since there are 2 columns with a gap-2 (0.5rem or 4px) and p-1 (4px padding) 
+                        // on the TabsList, the width of each trigger is close to 50%.
+                        // The `left` position needs to be '1px' (from p-1) + the width of the 'live' trigger.
+                        // A simpler and more robust solution is to use the `left` property based on the index:
+                        // 'live' is at 0%, 'past' is at 50% (since they are in a 2-col grid).
+                        style={{
+                          width: `calc(50% - 4px)`, // Width is 50% minus half the gap (4px total gap / 2 = 2px, but 4px looks better for padding)
+                          left: eventsTab === "live" ? "4px" : `calc(50% + 1px)`,
+                        }}
+                      />
+
+                      <TabsTrigger 
+                        value="live" 
+                        className="relative px-3 py-2 text-sm rounded-lg data-[state=active]:bg-transparent text-white data-[state=active]:text-white"
+                        // Removed the individual motion.div for live
+                      >
                         <span className="relative z-10">Live</span>
-                        {eventsTab === "live" && (
-                          <motion.div className="absolute inset-0 bg-blue-500/10 rounded-lg" layoutId="activeEventsBg" transition={{ type: "spring", duration: 0.6 }} />
-                        )}
                       </TabsTrigger>
-                      <TabsTrigger value="past" className="relative px-3 py-2 text-sm rounded-lg transition-all duration-300 hover-scale text-white">
+                      <TabsTrigger 
+                        value="past" 
+                        className="relative px-3 py-2 text-sm rounded-lg data-[state=active]:bg-transparent text-white data-[state=active]:text-white"
+                        // Removed the individual motion.div for past
+                      >
                         <span className="relative z-10">Past</span>
-                        {eventsTab === "past" && (
-                          <motion.div className="absolute inset-0 bg-blue-500/10 rounded-lg" layoutId="activeEventsBg" transition={{ type: "spring", duration: 0.6 }} />
-                        )}
                       </TabsTrigger>
                     </TabsList>
-                    <TabsContent value="live">
+                                        <TabsContent value="live">
                       <div className="mt-3 space-y-3 max-h-[60vh] overflow-y-auto pr-1">
                         {liveEvents.length === 0 ? (
-                          <div className="text-sm text-muted-foreground text-center py-6">No live events</div>
+                          <div className="text-sm text-muted-foreground text-center py-6 text-white">No live events</div>
                         ) : (
                           liveEvents.map((ev) => (
                             <Card key={ev.id} className="p-3 border border-border/50 bg-background/40">
@@ -300,7 +321,7 @@ export default function AccountPage() {
                     <TabsContent value="past">
                       <div className="mt-3 space-y-3 max-h-[60vh] overflow-y-auto pr-1">
                         {pastEvents.length === 0 ? (
-                          <div className="text-sm text-muted-foreground text-center py-6">No past events</div>
+                          <div className="text-sm text-muted-foreground text-center py-6 text-white">No past events</div>
                         ) : (
                           pastEvents.map((ev) => (
                             <Card key={ev.id} className="p-3 border border-border/50 bg-background/40">
