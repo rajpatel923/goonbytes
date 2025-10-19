@@ -61,25 +61,29 @@ export default function About() {
 
           {/* Team member images */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            <div className="flex justify-center">
-              <div className="aspect-square w-full max-w-[300px] bg-muted rounded-2xl animate-pulse-gentle">
-                <img src="public/snapshots/arnav.jpg" alt="Team member" className="w-full h-full object-cover rounded-2xl" />
+            <div className="flex flex-col items-center">
+              <div className="aspect-square w-full max-w-[300px] bg-muted rounded-2xl animate-pulse-gentle mb-4">
+                <img src="public/snapshots/arnav.jpg" alt="Arnav" className="w-full h-full object-cover rounded-2xl" />
               </div>
+              <h3 className="text-xl font-semibold text-blue-200">Arnav</h3>
             </div>
-            <div className="flex justify-center">
-              <div className="aspect-square w-full max-w-[300px] bg-muted rounded-2xl animate-pulse-gentle">
-                <img src="public/snapshots/chris.jpeg" alt="Team member" className="w-full h-full object-cover rounded-2xl" />
+            <div className="flex flex-col items-center">
+              <div className="aspect-square w-full max-w-[300px] bg-muted rounded-2xl animate-pulse-gentle mb-4">
+                <img src="public/snapshots/chris.jpeg" alt="Chris" className="w-full h-full object-cover rounded-2xl" />
               </div>
+              <h3 className="text-xl font-semibold text-blue-200">Chris</h3>
             </div>
-            <div className="flex justify-center">
-              <div className="aspect-square w-full max-w-[300px] bg-muted rounded-2xl animate-pulse-gentle">
-                <img src="public/snapshots/fowwaz.jpeg" alt="Team member" className="w-full h-full object-cover rounded-2xl" />
+            <div className="flex flex-col items-center">
+              <div className="aspect-square w-full max-w-[300px] bg-muted rounded-2xl animate-pulse-gentle mb-4">
+                <img src="public/snapshots/fowwaz.jpeg" alt="Fowwaz" className="w-full h-full object-cover rounded-2xl" />
               </div>
+              <h3 className="text-xl font-semibold text-blue-200">Fowwaz</h3>
             </div>
-            <div className="flex justify-center">
-              <div className="aspect-square w-full max-w-[300px] bg-muted rounded-2xl animate-pulse-gentle">
-                <img src="public/snapshots/raj.jpeg" alt="Team member" className="w-full h-full object-cover rounded-2xl" />
+            <div className="flex flex-col items-center">
+              <div className="aspect-square w-full max-w-[300px] bg-muted rounded-2xl animate-pulse-gentle mb-4">
+                <img src="public/snapshots/raj.jpeg" alt="Raj" className="w-full h-full object-cover rounded-2xl" />
               </div>
+              <h3 className="text-xl font-semibold text-blue-200">Raj</h3>
             </div>
           </div>
         </div>
