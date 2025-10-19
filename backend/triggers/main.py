@@ -16,7 +16,7 @@ from pathlib import Path
 from elevenlabs.client import ElevenLabs
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Email, To, Content, Attachment, FileContent, FileName, FileType, Disposition
-
+from fastapi.middleware.cors import CORSMiddleware
 
 import base64
 
@@ -24,6 +24,14 @@ import base64
 load_dotenv()
 
 app = FastAPI(title="Student Notification & Police Reporter")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:8080"
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+)
 
 # In-memory stores
 idempotency_store = {}
@@ -340,6 +348,7 @@ async def generate_tts(text: str, trace_id: str) -> str:
 
 
 # python
+'''
 async def send_sendgrid_email(to_email: str, subject: str, body: str, attachments=None):
     """
     Send email via SendGrid.
@@ -426,7 +435,7 @@ async def send_sendgrid_email(to_email: str, subject: str, body: str, attachment
     response = await asyncio.to_thread(sg.send, message)
     print(f"Status: {response.status_code}, Message ID: {response.headers.get('x-message-id')}")
     return response
-
+'''
 
 
 async def make_twilio_call(to_number: str, tts_url: str):
@@ -886,11 +895,13 @@ Video footage {"is attached to this email" if video_attached else "available at 
 """
 
             # Send email with all attachments
+            '''
             await send_sendgrid_email(police_email, subject, body, attachments)
             email_sent = True
             print(f"✓ Email sent to {police_email} with {len(attachments)} attachment(s)")
             if video_attached:
                 print(f"  ✓ Video file attached to email")
+            '''
 
         except Exception as e:
             print(f"✗ Email failed: {e}")
