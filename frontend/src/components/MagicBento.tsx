@@ -10,6 +10,7 @@ export interface BentoCardProps {
   imageSrc?: string;
   textAutoHide?: boolean;
   disableAnimations?: boolean;
+  maxLines?: number;
 }
 
 export interface BentoProps {
@@ -629,6 +630,33 @@ const MagicBento: React.FC<BentoProps> = ({
             text-overflow: ellipsis;
           }
           
+          .text-clamp-3 {
+            display: -webkit-box;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 3;
+            line-clamp: 3;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+          
+          .text-clamp-4 {
+            display: -webkit-box;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 4;
+            line-clamp: 4;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+          
+          .text-clamp-5 {
+            display: -webkit-box;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 5;
+            line-clamp: 5;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+          
           @media (max-width: 599px) {
             .card-responsive {
               grid-template-columns: 1fr;
@@ -700,11 +728,17 @@ const MagicBento: React.FC<BentoProps> = ({
                     ) : null}
                   </div>
                   <div className="card__content flex flex-col relative">
-                    <h3 className={`card__title font-normal text-xl md:text-2xl m-0 mb-0 ${textAutoHide ? 'text-clamp-1' : ''}`}>
+                    <h3 className={`card__title font-bold text-xl md:text-2xl m-0 mb-6 ${textAutoHide ? 'text-clamp-1' : ''}`}>
                       {card.title}
                     </h3>
                     <p
-                      className={`card__description text-sm md:text-base leading-6 opacity-90 ${textAutoHide ? 'text-clamp-2' : ''}`}
+                      className={`card__description text-sm md:text-base leading-6 opacity-90 ${
+                        textAutoHide 
+                          ? card.maxLines 
+                            ? `text-clamp-${Math.min(card.maxLines, 5)}` 
+                            : 'text-clamp-2'
+                          : ''
+                      }`}
                     >
                       {card.description}
                     </p>
@@ -841,7 +875,13 @@ const MagicBento: React.FC<BentoProps> = ({
                   <h3 className={`card__title font-normal text-xl md:text-2xl m-0 mb-0 ${textAutoHide ? 'text-clamp-1' : ''}`}>
                     {card.title}
                   </h3>
-                  <p className={`card__description text-sm md:text-base leading-6 opacity-90 ${textAutoHide ? 'text-clamp-2' : ''}`}>
+                  <p className={`card__description text-sm md:text-base leading-6 opacity-90 ${
+                    textAutoHide 
+                      ? card.maxLines 
+                        ? `text-clamp-${Math.min(card.maxLines, 5)}` 
+                        : 'text-clamp-2'
+                      : ''
+                  }`}>
                     {card.description}
                   </p>
                 </div>

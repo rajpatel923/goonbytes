@@ -228,6 +228,7 @@ export default function Index() {
                   description:
                     "Our advanced AI models analyze video feeds in real-time, detecting weapons, aggressive behavior, and suspicious activities with industry-leading accuracy. The system learns and adapts to your school's unique environment.",
                   icon: <Eye className="h-10 w-10 text-blue-400" />,
+                  maxLines: 4,
                 },
                 {
                   color: '#1F2022',
@@ -235,6 +236,7 @@ export default function Index() {
                   description:
                     'Audio analysis identifies gunshots, breaking glass, and distress calls. Our multi-modal approach combines visual and audio cues to provide comprehensive threat detection with minimal false positives.',
                   icon: <Bell className="h-10 w-10 text-blue-400" />,
+                  maxLines: 4,
                 },
                 {
                   color: '#1F2022',
@@ -242,6 +244,7 @@ export default function Index() {
                   description:
                     'Security personnel verify AI detections through an intuitive dashboard before escalation. This approach eliminates false alarms while maintaining rapid response times and building trust in the system.',
                   icon: <Shield className="h-10 w-10 text-blue-400" />,
+                  maxLines: 4,
                 },
                 {
                   color: '#1F2022',
@@ -249,6 +252,7 @@ export default function Index() {
                   description:
                     'Once verified, threats are immediately escalated to school administration and law enforcement with precise location data, camera feeds, and threat details—enabling the fastest possible response.',
                   icon: <Zap className="h-10 w-10 text-blue-400" />,
+                  maxLines: 4,
                 },
               ]}
             />
@@ -280,7 +284,7 @@ export default function Index() {
           </motion.div>
         </div>
       </section>
-      <div className='bg-[#1f2022] mt-[-80px] pb-16'>
+      <div className='bg-[#1f2022] mt-[-80px] pb-16 text-center'>
         <MagicBento
                 textAutoHide={true}
                 enableStars={true}
@@ -301,6 +305,7 @@ export default function Index() {
                     description:
                       'AI models continuously analyze incoming camera frames and optional audio streams to flag weapons, threats, or gunshots with precision.',
                     icon: <ScanLine className="h-10 w-10 text-blue-400" />,
+                    maxLines: 3,
                   },
                   {
                     color: '#1F2022',
@@ -308,6 +313,7 @@ export default function Index() {
                     description:
                       'Security personnel approve or reject each alert in the Events panel with a clear thumbnail, location data, and confidence score for informed decisions.',
                     icon: <Shield className="h-10 w-10 text-blue-400" />,
+                    maxLines: 3,
                   },
                   {
                     color: '#1F2022',
@@ -315,6 +321,7 @@ export default function Index() {
                     description:
                       'On approval, the system instantly notifies school administration and contacts local law enforcement automatically—no delays, no missed alerts.',
                     icon: <AlarmClock className="h-10 w-10 text-blue-400" />,
+                    maxLines: 3,
                   },
                 ]}
               />
